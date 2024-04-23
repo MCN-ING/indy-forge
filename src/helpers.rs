@@ -88,7 +88,6 @@ pub async fn register_nym(
             if cfg!(debug_assertions) {
                 println!("Reply: {:?}", message);
             }
-   
             Ok(message)
         }
         RequestResult::Failed(error) => {

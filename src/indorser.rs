@@ -43,7 +43,7 @@ pub fn endorser_tool(
             match signed_txn {
                 Ok(txn) => {
                     let unescaped_json = serde_json::to_string(&txn).unwrap();
-                    *signed_txn_result = Some(format!("{}", unescaped_json.clone()));
+                    *signed_txn_result = Some(unescaped_json.clone().to_string());
                 }
                 Err(e) => {
                     *signed_txn_result = Some(format!("Error: {:?}", e));
@@ -73,15 +73,7 @@ pub fn endorser_tool(
         // }
         ui.separator();
         ui.with_layout(egui::Layout::bottom_up(egui::Align::LEFT), |ui| {
-            powered_by_candy(ui);
             egui::warn_if_debug_build(ui);
         });
     }
-}
-
-fn powered_by_candy(ui: &mut egui::Ui) {
-    ui.horizontal(|ui| {
-        ui.spacing_mut().item_spacing.x = 0.0;
-        ui.label("CANdy tooling");
-    });
 }
