@@ -3,8 +3,8 @@
 ## About
 
 A graphical interface for various utilities that can be useful for Indy Ledger
-The app uses [egui](https://www.egui.rs/) for the GUI, as such you can run it natively on Windows, Linux and MacOS or ~~
-for the web, and share it using Github Pages.~~ (see issue #1)
+The app uses [egui](https://www.egui.rs/) for the GUI, as such you can run it natively on Windows, Linux and MacOS or 
+for the web, and share it using Github Pages. See issue #1
 
 ## Endorser Tool
 
