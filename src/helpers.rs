@@ -75,19 +75,25 @@ pub async fn register_nym(
     sign_nym_request(&mut nym_request, trustee)?;
 
     // Submit the signed request to the ledger
-    println!(
-        "Submitting NYM request: {:?}",
-        nym_request.req_json.to_string()
-    );
+    if cfg!(debug_assertions) {
+        println!(
+            "Submitting NYM request: {:?}",
+            nym_request.req_json.to_string()
+        );
+    }
     let (request_result, _) = perform_ledger_request(pool, &nym_request, None).await?;
 
     match request_result {
         RequestResult::Reply(message) => {
-            println!("Reply: {:?}", message);
+            if cfg!(debug_assertions) {
+                println!("Reply: {:?}", message);
+            }
             Ok(message)
         }
         RequestResult::Failed(error) => {
-            println!("Error: {:?}", error);
+            if cfg!(debug_assertions) {
+                println!("Error: {:?}", error);
+            }
             Err(error)
         }
     }
