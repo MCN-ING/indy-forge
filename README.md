@@ -1,7 +1,5 @@
 [![img](https://img.shields.io/badge/Cycle%20de%20Vie-Phase%20d%C3%A9couverte-339999)]
 
-[![img](https://img.shields.io/badge/Cycle%20de%20Vie-Phase%20découverte-339999)]
-
 # Indy Forge
 
 [![img](https://img.shields.io/badge/Version-0.4.0-blue)](
