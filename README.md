@@ -25,7 +25,7 @@ Run `cargo run` to start the app.
 ### Native Locally
 
 `cargo run --release`
-The executable will be in `target/release/indorser`
+The executable will be in `target/release/indyforge`
 
 On Linux you need to first run:
 
