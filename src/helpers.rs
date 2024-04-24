@@ -121,8 +121,7 @@ pub async fn register_nym(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use indy_data_types::did::DidValue;
-    use indy_data_types::keys::{KeyType, PrivateKey};
+    use indy_data_types::keys::KeyType;
     use serde_json::json;
 
     #[test]
