@@ -1777,8 +1777,8 @@ dependencies = [
 
 [[package]]
 name = "indy-vdr"
-version = "0.4.1"
-source = "git+https://github.com/hyperledger/indy-vdr.git#fbe4b57c6e46bbf334188aabc3ff0e44763007c9"
+version = "0.4.2"
+source = "git+https://github.com/hyperledger/indy-vdr.git#b33cbf9ddd22c58fe68e9b66fa6bccbfc556077e"
 dependencies = [
  "async-lock 3.3.0",
  "async-trait",
