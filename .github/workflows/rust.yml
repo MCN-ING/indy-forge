@@ -141,6 +141,7 @@ jobs:
           else
           sudo apt-get install -y cmake
           fi
+        shell: bash
 
       - uses: actions-rs/cargo@v1
         with:
