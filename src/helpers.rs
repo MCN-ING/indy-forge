@@ -7,8 +7,8 @@ use indy_vdr::pool::helpers::perform_ledger_request;
 use indy_vdr::pool::{PreparedRequest, ProtocolVersion, RequestResult, SharedPool};
 use serde_json::Value;
 
-pub fn create_did(seed: String) -> anyhow::Result<DidInfo> {
-    let (did, prv, vk) = generate_did(Some(seed.as_bytes()), Some(1))?;
+pub fn create_did(seed: String, version: usize) -> anyhow::Result<DidInfo> {
+    let (did, prv, vk) = generate_did(Some(seed.as_bytes()), Some(version))?;
     let endorser_did = DidInfo {
         did: DidValue::from(did.to_string()),
         privatekey: prv,

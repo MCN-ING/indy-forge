@@ -1,16 +1,19 @@
+use crate::app::DIDVersion;
 use crate::helpers::{create_did, sign_transaction};
 use egui::Ui;
+
 pub fn endorser_tool(
     ui: &mut Ui,
     endorser_seed: &mut String,
     txn: &mut String,
     signed_txn_result: &mut Option<String>,
+    did_version: &mut DIDVersion,
 ) {
     ui.label("Sign Txn with Endorser DID");
     // Add more UI elements inside the nested window
     ui.heading("Endorser");
 
-    ui.horizontal(|ui| {
+    ui.vertical(|ui| {
         ui.label("Endorser seed: ");
         ui.add(
             egui::TextEdit::singleline(endorser_seed)
@@ -18,10 +21,17 @@ pub fn endorser_tool(
                 .hint_text("Enter 32 bytes seed"),
         );
         ui.label(format!("Length: {}", endorser_seed.len()));
+        ui.label("Select the version for the DID.  did:Sov is 1, did:Indy is 2");
+        egui::ComboBox::from_id_source("version_dropdown")
+            .selected_text(format!("{:?}", did_version))
+            .show_ui(ui, |ui| {
+                ui.selectable_value(&mut *did_version, DIDVersion::Sov, "SOV");
+                ui.selectable_value(&mut *did_version, DIDVersion::Indy, "Indy");
+            });
     });
     ui.separator();
     if endorser_seed.len() == 32 {
-        let endorser_did = create_did(endorser_seed.clone()).unwrap();
+        let endorser_did = create_did(endorser_seed.clone(), did_version.to_usize()).unwrap();
         ui.colored_label(
             egui::Color32::KHAKI,
             format!("DID: {:?}", endorser_did.did.0),

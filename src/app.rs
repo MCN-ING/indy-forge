@@ -10,6 +10,20 @@ pub enum MyRoles {
     NetworkMonitor = 201,
     Steward = 2,
 }
+
+#[derive(PartialEq, Eq, Deserialize, Serialize, Debug)]
+pub enum DIDVersion {
+    Sov,
+    Indy,
+}
+impl DIDVersion {
+    pub fn to_usize(&self) -> usize {
+        match self {
+            DIDVersion::Sov => 1,
+            DIDVersion::Indy => 2,
+        }
+    }
+}
 impl Default for MyRoles {
     fn default() -> Self {
         Self::Endorser
@@ -33,6 +47,7 @@ pub struct TemplateApp {
     my_role: MyRoles,
     nym_did: DidInfo,
     trustee_did: DidInfo,
+    did_version: DIDVersion,
 }
 
 impl Default for TemplateApp {
@@ -50,6 +65,7 @@ impl Default for TemplateApp {
             my_role: Default::default(),
             nym_did: Default::default(),
             trustee_did: Default::default(),
+            did_version: DIDVersion::Indy,
         }
     }
 }
@@ -127,6 +143,7 @@ impl eframe::App for TemplateApp {
                             &mut self.endorser_seed,
                             &mut self.txn,
                             &mut self.signed_txn_result,
+                            &mut self.did_version,
                         );
                     });
             }
@@ -147,6 +164,7 @@ impl eframe::App for TemplateApp {
                             &mut self.my_role,
                             &mut self.nym_did,
                             &mut self.trustee_did,
+                            &mut self.did_version,
                         );
                     });
             }

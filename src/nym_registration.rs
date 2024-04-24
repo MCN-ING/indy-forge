@@ -5,9 +5,10 @@ use indy_vdr::ledger::constants::{LedgerRole, UpdateRole};
 use indy_vdr::pool::{PoolBuilder, PoolTransactions};
 use rfd::FileDialog;
 
-use crate::app::MyRoles;
+use crate::app::{DIDVersion, MyRoles};
 use crate::helpers::{create_did, register_nym, DidInfo};
 
+#[allow(clippy::too_many_arguments)]
 pub fn nym_registration_tool(
     ui: &mut Ui,
     trustee_seed: &mut String,
@@ -16,6 +17,7 @@ pub fn nym_registration_tool(
     my_role: &mut MyRoles,
     nym_did: &mut DidInfo,
     trustee_did: &mut DidInfo,
+    did_version: &mut DIDVersion,
 ) {
     ui.heading("Nym Creation Tool");
     ui.separator();
@@ -33,8 +35,14 @@ pub fn nym_registration_tool(
                     .hint_text("Enter 32 bytes seed"),
             );
             ui.label(format!("Length: {}", trustee_seed.len()));
+            ui.label("Select the version used for the trustee DID.  did:Sov is 1, did:Indy is 2");
+            egui::ComboBox::from_id_source("did_version_dropdown")
+                .selected_text(format!("{:?}", did_version))
+                .show_ui(ui, |ui| {
+                    ui.selectable_value(&mut *did_version, DIDVersion::Sov, "SOV");
+                    ui.selectable_value(&mut *did_version, DIDVersion::Indy, "Indy");
+                });
         });
-
         ui.separator();
         ui.vertical(|ui| {
             ui.heading("NYM Registration");
@@ -62,7 +70,7 @@ pub fn nym_registration_tool(
         });
         ui.separator();
         ui.label("Select the role for the NYM");
-        egui::ComboBox::from_id_source("my_dropdown")
+        egui::ComboBox::from_id_source("my_role_dropdown")
             .selected_text(format!("{:?}", my_role))
             .show_ui(ui, |ui| {
                 ui.selectable_value(&mut *my_role, MyRoles::Endorser, "Endorser");
@@ -87,7 +95,7 @@ pub fn nym_registration_tool(
                 MyRoles::Steward => UpdateRole::Set(LedgerRole::Steward),
             };
 
-            match create_did(trustee_seed.clone()) {
+            match create_did(trustee_seed.clone(), did_version.to_usize()) {
                 Ok(did) => *trustee_did = did,
                 Err(e) => {
                     eprintln!("Error occurred: {:?}", e);

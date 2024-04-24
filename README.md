@@ -22,6 +22,8 @@ Tool for registering a new NYM and it's role on the Indy Ledger
 Make sure you are using the latest version of stable rust by running `rustup update`.
 Run `cargo run` to start the app.
 
+You might require cmake to be present depending on your system.
+
 ### Native Locally
 
 `cargo run --release`
@@ -37,4 +39,8 @@ On Fedora Rawhide you need to run:
 
 ### Web Locally
 
-Sadly, for the moment, the zmq library is preventing a webassembly build. 
+Sadly, for the moment, the zmq library is preventing a webassembly build.
+
+### Roadmap
+
+Using a wallet instead of asking for the seed
