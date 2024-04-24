@@ -14,4 +14,4 @@ target_wasm
 .idea
 
 # just in case...
-pool_transactions_genesiss
+**/pool_transactions_genesis
