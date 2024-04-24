@@ -41,22 +41,22 @@ jobs:
   #  #          command: check
   #  #          args: --all-features --lib --target wasm32-unknown-unknown
   #
-  #  test:
-  #    name: Test Suite
-  #    runs-on: ubuntu-latest
-  #    steps:
-  #      - uses: actions/checkout@v4
-  #      - uses: actions-rs/toolchain@v1
-  #        with:
-  #          profile: minimal
-  #          toolchain: stable
-  #          override: true
-  #      - run: sudo apt-get install libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libxkbcommon-dev libssl-dev
-  #      - uses: actions-rs/cargo@v1
-  #        with:
-  #          command: test
-  #          args: --lib
-  #
+  test:
+    name: Test Suite
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+      - run: sudo apt-get install libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libxkbcommon-dev libssl-dev
+      - uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --lib
+
   fmt:
     name: Rustfmt
     runs-on: ubuntu-latest
@@ -88,65 +88,66 @@ jobs:
         with:
           command: clippy
           args: -- -D warnings
-#
-#  #  trunk:
-#  #    name: trunk
-#  #    runs-on: ubuntu-latest
-#  #    steps:
-#  #      - uses: actions/checkout@v4
-#  #      - uses: actions-rs/toolchain@v1
-#  #        with:
-#  #          profile: minimal
-#  #          toolchain: 1.76.0
-#  #          target: wasm32-unknown-unknown
-#  #          override: true
-#  #      - name: Download and install Trunk binary
-#  #        run: wget -qO- https://github.com/thedodd/trunk/releases/latest/download/trunk-x86_64-unknown-linux-gnu.tar.gz | tar -xzf-
-#  #      - name: Build
-#  #        run: ./trunk build
-#
-#  build:
-#    runs-on: ${{ matrix.os }}
-#    strategy:
-#      fail-fast: false
-#      matrix:
-#        include:
-#          - os: macos-latest
-#            TARGET: aarch64-apple-darwin
-#
-#          - os: macos-latest
-#            TARGET: x86_64-apple-darwin
-#
-#          - os: ubuntu-latest
-#            TARGET: arm-unknown-linux-musleabihf
-#
-#          - os: ubuntu-latest
-#            TARGET: armv7-unknown-linux-musleabihf
-#
-#          - os: ubuntu-latest
-#            TARGET: x86_64-unknown-linux-musl
-#
-#          - os: windows-latest
-#            TARGET: x86_64-pc-windows-msvc
-#            EXTENSION: .exe
-#
-#    steps:
-#      - name: Building ${{ matrix.TARGET }}
-#        run: echo "${{ matrix.TARGET }}"
-#
-#      - uses: actions/checkout@master
-#      - uses: actions-rs/toolchain@v1.0.1
-#        with:
-#          toolchain: stable
-#          target: ${{ matrix.TARGET }}
-#          override: true
-#
-#      - uses: actions-rs/cargo@v1
-#        with:
-#          use-cross: true
-#          command: build
-#          args: --verbose --release --target=${{ matrix.TARGET }}
-#
+  #
+  #  #  trunk:
+  #  #    name: trunk
+  #  #    runs-on: ubuntu-latest
+  #  #    steps:
+  #  #      - uses: actions/checkout@v4
+  #  #      - uses: actions-rs/toolchain@v1
+  #  #        with:
+  #  #          profile: minimal
+  #  #          toolchain: 1.76.0
+  #  #          target: wasm32-unknown-unknown
+  #  #          override: true
+  #  #      - name: Download and install Trunk binary
+  #  #        run: wget -qO- https://github.com/thedodd/trunk/releases/latest/download/trunk-x86_64-unknown-linux-gnu.tar.gz | tar -xzf-
+  #  #      - name: Build
+  #  #        run: ./trunk build
+  #
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            TARGET: aarch64-apple-darwin
+
+          - os: ubuntu-latest
+            TARGET: x86_64-unknown-linux-musl
+
+          - os: windows-latest
+            TARGET: x86_64-pc-windows-msvc
+            EXTENSION: .exe
+
+    steps:
+      - name: Building ${{ matrix.TARGET }}
+        run: echo "${{ matrix.TARGET }}"
+
+      - uses: actions/checkout@master
+      - uses: actions-rs/toolchain@v1.0.1
+        with:
+          toolchain: stable
+          target: ${{ matrix.TARGET }}
+          override: true
+
+      - name: Install CMake
+        run: |
+          if [[ "${{ runner.os }}" == "Windows" ]]; then
+          choco install cmake --installer 'ADD_CMAKE_TO_PATH=System'
+          elif [[ "${{ runner.os }}" == "macOS" ]]; then
+          brew install cmake
+          else
+          sudo apt-get install -y cmake
+          fi
+
+      - uses: actions-rs/cargo@v1
+        with:
+          use-cross: true
+          command: build
+          args: --verbose --release --target=${{ matrix.TARGET }}
+
 #      - name: Rename
 #        run: cp target/${{ matrix.TARGET }}/release/eframe_template${{ matrix.EXTENSION }} eframe_template-${{ matrix.TARGET }}${{ matrix.EXTENSION }}
 #
