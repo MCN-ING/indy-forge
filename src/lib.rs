@@ -3,6 +3,10 @@
 pub use app::TemplateApp;
 
 mod app;
+mod endorsing;
+mod helper;
 mod helpers;
 mod indorser;
 mod nym_registration;
+mod publish_tool;
+mod wallet_tool;

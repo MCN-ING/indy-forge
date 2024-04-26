@@ -6,7 +6,7 @@ use indy_vdr::pool::{PoolBuilder, PoolTransactions};
 use rfd::FileDialog;
 
 use crate::app::{DIDVersion, MyRoles};
-use crate::helpers::{create_did, register_nym, DidInfo};
+use crate::helper::{create_did, register_nym, DidInfo};
 
 #[allow(clippy::too_many_arguments)]
 pub fn nym_registration_tool(

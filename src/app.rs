@@ -1,8 +1,15 @@
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
+use futures_executor::block_on;
+use indy_vdr::common::error::VdrResult;
 
-use crate::helpers::DidInfo;
+use crate::helper::DidInfo;
+use crate::helpers::ledgers::{IndyLedger, Ledgers};
+use crate::helpers::wallet::IndyWallet;
 use crate::indorser::endorser_tool;
 use crate::nym_registration::nym_registration_tool;
+use crate::publish_tool::publish_tool_ui;
+use crate::wallet_tool::create_wallet_ui;
 
 #[derive(PartialEq, Eq, Deserialize, Serialize, Debug)]
 pub enum MyRoles {
@@ -11,6 +18,11 @@ pub enum MyRoles {
     Steward = 2,
 }
 
+#[derive(Debug)]
+pub struct NymInfo {
+    pub(crate) did: String,
+    pub(crate) verkey: String,
+}
 #[derive(PartialEq, Eq, Deserialize, Serialize, Debug)]
 pub enum DIDVersion {
     Sov,
@@ -44,10 +56,15 @@ pub struct TemplateApp {
     show_nym_creation: bool,
     picked_path: Option<String>,
     nym_result: String,
-    my_role: MyRoles,
+    nym_role: MyRoles,
     nym_did: DidInfo,
     trustee_did: DidInfo,
     did_version: DIDVersion,
+    wallet: Option<IndyWallet>,
+    publish_option: String,
+    nym_info: NymInfo,
+    ledgers: Option<IndyLedger>,
+    txn_result: String,
 }
 
 impl Default for TemplateApp {
@@ -62,10 +79,19 @@ impl Default for TemplateApp {
             show_nym_creation: true,
             picked_path: Default::default(),
             nym_result: "".to_owned(),
-            my_role: Default::default(),
+            nym_role: Default::default(),
             nym_did: Default::default(),
             trustee_did: Default::default(),
             did_version: DIDVersion::Indy,
+            wallet: None,
+            publish_option: "".to_owned(),
+            nym_info: NymInfo {
+                did: "".to_owned(),
+                verkey: "".to_owned(),
+            },
+            ledgers: None,
+            txn_result: "".to_owned(),
+     
         }
     }
 }
@@ -161,13 +187,39 @@ impl eframe::App for TemplateApp {
                             &mut self.trustee_seed,
                             &mut self.nym_result,
                             &mut self.picked_path,
-                            &mut self.my_role,
+                            &mut self.nym_role,
                             &mut self.nym_did,
                             &mut self.trustee_did,
                             &mut self.did_version,
                         );
                     });
             }
+
+            // Wallet Tool section
+            egui::Window::new("Wallet Tool")
+                .default_size([600.0, 300.0])
+                .show(ui.ctx(), |ui| {
+                    ui.heading("Wallet Tool");
+                    ui.separator();
+                    ui.label("Tool that create a temporary wallet and hold the DID used by the other tools");
+                    create_wallet_ui(ui, &mut self.trustee_seed, &mut self.wallet, &mut self.picked_path, &mut self.did_version).expect("Something went wrong with the wallet creation");
+                });
+  
+
+            // Publish Tool section
+            egui::Window::new("Publish Tool")
+                .default_size([600.0, 300.0])
+                .show(ui.ctx(), |ui| {
+                    ui.heading("Publish Tool");
+                    ui.separator();
+                   if self.picked_path.is_some() && self.wallet.is_some() {
+                       // connect to the ledger
+                       self.ledgers = Some(block_on(IndyLedger::new(self.picked_path.clone().unwrap())));                    
+                      publish_tool_ui(ui, &mut self.wallet, &mut self.publish_option, &mut self.nym_role, &mut self.nym_info, &mut self.picked_path, &mut self.ledgers, &mut self.txn_result).expect("Something went wrong with the publish tool");
+                   } else { 
+                       ui.label("Please select a genesis file and create a wallet first");}
+                   
+                });
         });
     }
 }
