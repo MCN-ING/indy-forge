@@ -1,11 +1,15 @@
-use crate::app::{MyRoles, NymInfo};
+use crate::app::{MyRoles, NymInfo, SchemaInfo};
+use crate::helper::DidInfo;
 use crate::helpers::ledgers::{IndyLedger, Ledgers};
 use crate::helpers::wallet::IndyWallet;
 use derive_more::Display;
 use egui::{Button, ComboBox, Label, TextEdit, Ui};
 use futures_executor::block_on;
+use indy_data_types::anoncreds::schema::{
+    AttributeNames, Schema as IndySchema, SchemaV1 as IndySchemaV1,
+};
 use indy_data_types::did::DidValue;
-use indy_data_types::Validatable;
+use indy_data_types::{SchemaId, Validatable};
 use indy_vdr::common::error::VdrResult;
 use indy_vdr::ledger::constants::{LedgerRole, UpdateRole};
 
@@ -18,6 +22,8 @@ enum PublishEntities {
     Custom,
 }
 
+// FIXME: This function has too many arguments. Consider grouping them into a struct.
+#[allow(clippy::too_many_arguments)]
 pub fn publish_tool_ui(
     ui: &mut Ui,
     wallet: &mut Option<IndyWallet>,
@@ -27,15 +33,18 @@ pub fn publish_tool_ui(
     picked_path: &mut Option<String>,
     ledgers: &mut Option<IndyLedger>,
     txn_result: &mut String,
+    schema_info: &mut SchemaInfo,
+    txn: &mut String,
+    signed_txn_result: &mut Option<String>,
 ) -> anyhow::Result<()> {
     ui.label("Publish something on a ledger");
 
     let options = vec![
-        PublishEntities::CredDef,
+        //PublishEntities::Attrib,
+        //PublishEntities::CredDef,
         PublishEntities::Nym,
-        PublishEntities::Attrib,
         PublishEntities::Schema,
-        PublishEntities::Custom,
+        //PublishEntities::Custom,
     ];
     ComboBox::from_id_source("publish_option")
         .selected_text(publish_option.as_str())
@@ -45,11 +54,165 @@ pub fn publish_tool_ui(
             }
         });
 
-    if *publish_option == PublishEntities::Nym.to_string() {
+    if *publish_option == PublishEntities::CredDef.to_string() {
+        ui.heading("Cred Def registration");
+    } else if *publish_option == PublishEntities::Attrib.to_string() {
+        ui.heading("Attrib registration");
+    } else if *publish_option == PublishEntities::Schema.to_string() {
+        //region SCHEMA REGISTRATION
+        ui.heading("Schema registration");
+        //build a form that ask for the schema name, version, and attributes.  You can add extra attributes by clicking a+ sign
+        //and remove them by clicking a - sign.  The form should have a submit button that will send the schema to the ledger.
+
+        // Initialize a vector to hold the attributes
+        ui.add(
+            egui::TextEdit::singleline(&mut schema_info.schema_name).hint_text("Enter schema name"),
+        );
+        ui.add(
+            egui::TextEdit::singleline(&mut schema_info.schema_version)
+                .hint_text("Enter schema version"),
+        );
+        let version_parts: Vec<&str> = schema_info.schema_version.split('.').collect();
+        if version_parts.len() != 3
+            || version_parts
+                .iter()
+                .any(|part| part.parse::<u32>().is_err())
+        {
+            // Handle the error, e.g., by displaying an error message
+            ui.label("Error: The version must have three parts, separated by dots, and each part must be a number.");
+        }
+        ui.horizontal(|ui| {
+            ui.add(
+                egui::TextEdit::singleline(&mut schema_info.new_attribute)
+                    .hint_text("Enter new attribute"),
+            );
+            if ui.button("+").clicked() && !schema_info.new_attribute.is_empty() {
+                {
+                    schema_info
+                        .attributes
+                        .push(schema_info.new_attribute.clone());
+                    schema_info.new_attribute.clear();
+                }
+            }
+        });
+
+        let mut to_remove = Vec::new();
+        for (index, attribute) in schema_info.attributes.iter().enumerate() {
+            ui.horizontal(|ui| {
+                ui.label(attribute);
+                if ui.button("-").clicked() {
+                    to_remove.push(index);
+                }
+            });
+        }
+        for index in to_remove.iter().rev() {
+            schema_info.attributes.remove(*index);
+        }
+        if ui.button("Schema Done").clicked() {
+            schema_info.schema_done_clicked = true;
+        }
+
+        // Check the variable to decide whether to display the schema information or not
+        if schema_info.schema_done_clicked {
+            // Display the full schema struct (minus "new_attribute") on the right side
+            ui.colored_label(egui::Color32::KHAKI, "Schema:");
+            ui.label(format!("Name: {}", schema_info.schema_name));
+            ui.label(format!("Version: {}", schema_info.schema_version));
+            ui.colored_label(egui::Color32::KHAKI, "Attributes:");
+            for attribute in &schema_info.attributes {
+                ui.label(attribute);
+            }
+            let wallet_ref = wallet.as_ref().unwrap();
+            let schema_to_publish: IndySchema = IndySchema::SchemaV1(IndySchemaV1 {
+                id: SchemaId::new(
+                    &DidValue(wallet_ref.did.clone()),
+                    &schema_info.schema_name.clone(),
+                    &schema_info.schema_version.clone(),
+                ),
+                name: schema_info.schema_name.clone(),
+                version: schema_info.schema_version.clone(),
+                attr_names: AttributeNames::from(schema_info.attributes.clone()),
+                seq_no: None,
+            });
+            ui.label(format!("Schema to publish: {:?}", schema_to_publish));
+            let is_schema_valid = schema_to_publish.validate();
+
+            match is_schema_valid {
+                Ok(_) => ui.label("The schema seems valid."),
+                Err(e) => ui.label(format!("Invalid schema: {} ", e)),
+            };
+            if ui.button("Register Schema").clicked() && picked_path.is_some() {
+                ui.label("Registering Schema...");
+
+                let wallet_ref = wallet.as_ref().unwrap();
+                if let Some(ledger) = ledgers {
+                    match block_on(IndyLedger::publish_schema(
+                        ledger,
+                        wallet_ref,
+                        &wallet_ref.did,
+                        &schema_to_publish,
+                    )) {
+                        Ok(result) => {
+                            *txn_result = result;
+                        }
+                        Err(e) => {
+                            *txn_result = e.to_string();
+                        }
+                    }
+                }
+            }
+        }
+    //endregion
+    } else if *publish_option == PublishEntities::Custom.to_string() {
+        //region CUSTOM REGISTRATION
+        ui.heading("Custom txn registration");
+        ui.separator();
+
+        let response_txn = ui.add(
+            egui::TextEdit::multiline(txn)
+                .hint_text("Input Signed Transaction")
+                .desired_width(f32::INFINITY),
+        );
+        ui.separator();
+        if ui.button("Register Custom Txn").clicked() {
+            match block_on(IndyLedger::write_signed_transaction_to_ledger(
+                ledgers.as_ref().unwrap(),
+                wallet.as_ref().unwrap(),
+                txn,
+            )) {
+                Ok(result) => {
+                    *txn_result = result;
+                }
+                Err(e) => {
+                    *txn_result = e.to_string();
+                }
+            }
+        }
+
+        ui.vertical(|ui| {
+            ui.label("Signed Transaction:");
+            if let Some(result) = &signed_txn_result {
+                // ui.colored_label(egui::Color32::GREEN, "Signed Transaction:");
+                ui.colored_label(egui::Color32::GREEN, result.clone());
+
+                ui.separator();
+                // Add a button to copy the unescaped_json content
+                if ui.button("Copy output").clicked() {
+                    let r = result.clone();
+                    ui.output_mut(|o| o.copied_text = r);
+                };
+            }
+        });
+        ui.separator();
+        //endregion
+    } else if *publish_option == PublishEntities::Nym.to_string() {
         ui.vertical(|ui| {
             ui.heading("NYM Registration");
-            ui.label("Enter the NYM DID and Verkey that you want to register");
-            ui.label("NYM DID: ");
+            ui.colored_label(
+                egui::Color32::from_rgb(144, 238, 144),
+                "Enter the NYM DID and Verkey that you want to register",
+            );
+            ui.colored_label(egui::Color32::from_rgb(144, 238, 144), "NYM DID: ");
             ui.add(
                 egui::TextEdit::singleline(&mut nym_info.did)
                     .char_limit(32)
@@ -68,6 +231,19 @@ pub fn publish_tool_ui(
             Ok(_) => ui.label("The entered NYM Verkey seems valid."),
             Err(e) => ui.label(format!("Invalid NYM Verkey: {} ", e)),
         };
+        ui.colored_label(egui::Color32::from_rgb(144, 238, 144), "NYM Alias:");
+        if let Some(alias) = &mut nym_info.alias {
+            ui.add(egui::TextEdit::singleline(alias).hint_text("NYM Alias"));
+            if alias.trim().is_empty() {
+                nym_info.alias = None;
+            }
+        } else {
+            let mut new_alias = String::new();
+            ui.add(egui::TextEdit::singleline(&mut new_alias).hint_text("NYM Alias"));
+            if !new_alias.trim().is_empty() {
+                nym_info.alias = Some(new_alias);
+            }
+        }
 
         ui.label("Select the role for the NYM");
         egui::ComboBox::from_id_source("my_role_nym")
@@ -122,8 +298,7 @@ pub fn publish_tool_ui(
                         ledger,
                         wallet_ref,
                         &wallet_ref.did,
-                        &nym_info.did,
-                        &nym_info.verkey,
+                        nym_info,
                         role,
                     )) {
                         Ok(result) => {
@@ -139,11 +314,9 @@ pub fn publish_tool_ui(
                 }
             }
         }
-
-        ui.separator();
-        ui.label("Result:");
-        ui.monospace(format!("{:?}", txn_result));
     }
-
+    ui.separator();
+    ui.label("Result:");
+    ui.monospace(format!("{:?}", txn_result));
     Ok(())
 }

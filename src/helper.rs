@@ -1,5 +1,7 @@
+use crate::helpers::wallet::IndyWallet;
+use aries_askar::kms::LocalKey;
 use indy_data_types::did::{generate_did, DidValue};
-use indy_data_types::keys::PrivateKey;
+use indy_data_types::keys::{KeyType, PrivateKey};
 use indy_vdr::common::error::VdrResult;
 use indy_vdr::ledger::constants::UpdateRole;
 use indy_vdr::ledger::RequestBuilder;
