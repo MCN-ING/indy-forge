@@ -1,10 +1,10 @@
-use serde::{Deserialize, Serialize};
-use futures_executor::block_on;
 use crate::helpers::ledgers::IndyLedger;
 use crate::helpers::wallet::IndyWallet;
 use crate::indorser::endorser_tool;
 use crate::publish_tool::publish_tool_ui;
 use crate::wallet_tool::create_wallet_ui;
+use futures_executor::block_on;
+use serde::{Deserialize, Serialize};
 
 #[derive(PartialEq, Eq, Deserialize, Serialize, Debug)]
 pub enum MyRoles {
@@ -19,7 +19,6 @@ pub struct SchemaInfo {
     pub attributes: Vec<String>,
     pub new_attribute: String,
     pub schema_done_clicked: bool,
-
 }
 
 pub struct ToolVisibility {
@@ -107,7 +106,6 @@ impl Default for TemplateApp {
                 new_attribute: "".to_owned(),
                 schema_done_clicked: false,
             },
-     
         }
     }
 }
@@ -204,7 +202,6 @@ impl eframe::App for TemplateApp {
                     create_wallet_ui(ui, &mut self.trustee_seed, &mut self.wallet, &mut self.picked_path, &mut self.did_version).expect("Something went wrong with the wallet creation");
                 });
             }
-            
             if self.tool_visibility.show_publish_tool {
                 // Publish Tool section
                 egui::Window::new("Publish Tool")
