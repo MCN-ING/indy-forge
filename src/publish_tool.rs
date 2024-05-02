@@ -1,16 +1,14 @@
 use crate::app::{MyRoles, NymInfo, SchemaInfo};
-use crate::helper::DidInfo;
-use crate::helpers::ledgers::{IndyLedger, Ledgers};
+use crate::helpers::ledgers::IndyLedger;
 use crate::helpers::wallet::IndyWallet;
 use derive_more::Display;
-use egui::{Button, ComboBox, Label, TextEdit, Ui};
+use egui::{ComboBox, Ui};
 use futures_executor::block_on;
 use indy_data_types::anoncreds::schema::{
     AttributeNames, Schema as IndySchema, SchemaV1 as IndySchemaV1,
 };
 use indy_data_types::did::DidValue;
 use indy_data_types::{SchemaId, Validatable};
-use indy_vdr::common::error::VdrResult;
 use indy_vdr::ledger::constants::{LedgerRole, UpdateRole};
 
 #[derive(PartialEq, Eq, Debug, Display)]
@@ -44,7 +42,7 @@ pub fn publish_tool_ui(
         //PublishEntities::CredDef,
         PublishEntities::Nym,
         PublishEntities::Schema,
-        //PublishEntities::Custom,
+        PublishEntities::Custom,
     ];
     ComboBox::from_id_source("publish_option")
         .selected_text(publish_option.as_str())
@@ -168,7 +166,7 @@ pub fn publish_tool_ui(
         ui.heading("Custom txn registration");
         ui.separator();
 
-        let response_txn = ui.add(
+        ui.add(
             egui::TextEdit::multiline(txn)
                 .hint_text("Input Signed Transaction")
                 .desired_width(f32::INFINITY),

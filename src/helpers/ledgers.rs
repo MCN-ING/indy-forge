@@ -99,6 +99,7 @@ impl IndyLedger {
         signed_txn: &mut String,
     ) -> VdrResult<String> {
         let mut req = PreparedRequest::from_request_json(signed_txn)?;
+        println!("Request: {:?}", req.req_json.to_string());
         self._sign_and_submit_request(wallet, &mut req).await
     }
 
@@ -110,6 +111,7 @@ impl IndyLedger {
         let sig_bytes = request.get_signature_input()?;
         let signature = wallet.sign(sig_bytes.as_bytes()).await;
         request.set_signature(&signature)?;
+        println!("Request2: {:?}", request.req_json.to_string());
         self._submit_request(request).await
     }
 
