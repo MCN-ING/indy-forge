@@ -1,5 +1,5 @@
 use crate::app::DIDVersion;
-use crate::helpers::{create_did, sign_transaction};
+use crate::helper::{create_did, sign_transaction};
 use egui::Ui;
 
 pub fn endorser_tool(

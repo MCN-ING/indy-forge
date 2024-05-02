@@ -1,8 +1,10 @@
-use serde::{Deserialize, Serialize};
-
-use crate::helpers::DidInfo;
+use crate::helpers::ledgers::IndyLedger;
+use crate::helpers::wallet::IndyWallet;
 use crate::indorser::endorser_tool;
-use crate::nym_registration::nym_registration_tool;
+use crate::publish_tool::publish_tool_ui;
+use crate::wallet_tool::create_wallet_ui;
+use futures_executor::block_on;
+use serde::{Deserialize, Serialize};
 
 #[derive(PartialEq, Eq, Deserialize, Serialize, Debug)]
 pub enum MyRoles {
@@ -11,6 +13,26 @@ pub enum MyRoles {
     Steward = 2,
 }
 
+pub struct SchemaInfo {
+    pub schema_name: String,
+    pub schema_version: String,
+    pub attributes: Vec<String>,
+    pub new_attribute: String,
+    pub schema_done_clicked: bool,
+}
+
+pub struct ToolVisibility {
+    show_endorser: bool,
+    show_publish_tool: bool,
+    show_wallet_tool: bool,
+}
+
+#[derive(Debug)]
+pub struct NymInfo {
+    pub(crate) did: String,
+    pub(crate) verkey: String,
+    pub(crate) alias: Option<String>,
+}
 #[derive(PartialEq, Eq, Deserialize, Serialize, Debug)]
 pub enum DIDVersion {
     Sov,
@@ -40,14 +62,16 @@ pub struct TemplateApp {
     endorser_seed: String,
     txn: String,
     signed_txn_result: std::option::Option<String>,
-    show_indorser: bool,
-    show_nym_creation: bool,
+    tool_visibility: ToolVisibility,
     picked_path: Option<String>,
-    nym_result: String,
-    my_role: MyRoles,
-    nym_did: DidInfo,
-    trustee_did: DidInfo,
+    nym_role: MyRoles,
     did_version: DIDVersion,
+    wallet: Option<IndyWallet>,
+    publish_option: String,
+    nym_info: NymInfo,
+    ledgers: Option<IndyLedger>,
+    txn_result: String,
+    schema_info: SchemaInfo,
 }
 
 impl Default for TemplateApp {
@@ -58,14 +82,30 @@ impl Default for TemplateApp {
             endorser_seed: "".to_owned(),
             txn: "".to_owned(),
             signed_txn_result: None,
-            show_indorser: true,
-            show_nym_creation: true,
+            tool_visibility: ToolVisibility {
+                show_endorser: true,
+                show_publish_tool: true,
+                show_wallet_tool: true,
+            },
             picked_path: Default::default(),
-            nym_result: "".to_owned(),
-            my_role: Default::default(),
-            nym_did: Default::default(),
-            trustee_did: Default::default(),
+            nym_role: Default::default(),
             did_version: DIDVersion::Indy,
+            wallet: None,
+            publish_option: "".to_owned(),
+            nym_info: NymInfo {
+                did: "".to_owned(),
+                verkey: "".to_owned(),
+                alias: None,
+            },
+            ledgers: None,
+            txn_result: "".to_owned(),
+            schema_info: SchemaInfo {
+                schema_name: "".to_owned(),
+                schema_version: "".to_owned(),
+                attributes: Vec::new(),
+                new_attribute: "".to_owned(),
+                schema_done_clicked: false,
+            },
         }
     }
 }
@@ -122,8 +162,9 @@ impl eframe::App for TemplateApp {
                     ui.heading("Tools");
                 });
                 // Add a checkbox to toggle the visibility of the "Indorser" window
-                ui.checkbox(&mut self.show_indorser, "Endorser Tool");
-                ui.checkbox(&mut self.show_nym_creation, "Nym creation Tool");
+                ui.checkbox(&mut self.tool_visibility.show_endorser, "Endorser Tool");
+                ui.checkbox(&mut self.tool_visibility.show_publish_tool, "Publish Tool");
+                ui.checkbox(&mut self.tool_visibility.show_wallet_tool, "Wallet Tool");
                 ui.separator();
                 if ui.button("Organize windows").clicked() {
                     ui.ctx().memory_mut(|mem| mem.reset_areas());
@@ -133,7 +174,7 @@ impl eframe::App for TemplateApp {
             // The central panel the region left after adding TopPanel's and SidePanel's
 
             // Indorser Tool section
-            if self.show_indorser {
+            if self.tool_visibility.show_endorser {
                 // Only show the "Indorser" window if `show_indorser` is true
                 egui::Window::new("Endorser Tool")
                     // .default_pos(egui::pos2(0.0, 0.0))
@@ -148,24 +189,33 @@ impl eframe::App for TemplateApp {
                     });
             }
 
-            // Nym Creation Tool section
-            if self.show_nym_creation {
-                // Only show the "Nym Creation Tool" window if `show_nym_creation` is true
 
-                egui::Window::new("Nym Creation Tool")
+
+            if self.tool_visibility.show_wallet_tool {
+            // Wallet Tool section
+            egui::Window::new("Wallet Tool")
+                .default_size([600.0, 300.0])
+                .show(ui.ctx(), |ui| {
+                    ui.heading("Wallet Tool");
+                    ui.separator();
+                    ui.label("Tool that create a temporary wallet and hold the DID used by the other tools");
+                    create_wallet_ui(ui, &mut self.trustee_seed, &mut self.wallet, &mut self.picked_path, &mut self.did_version).expect("Something went wrong with the wallet creation");
+                });
+            }
+            if self.tool_visibility.show_publish_tool {
+                // Publish Tool section
+                egui::Window::new("Publish Tool")
                     .default_size([600.0, 300.0])
-                    // .default_pos(egui::pos2(800.0, 400.0))
                     .show(ui.ctx(), |ui| {
-                        nym_registration_tool(
-                            ui,
-                            &mut self.trustee_seed,
-                            &mut self.nym_result,
-                            &mut self.picked_path,
-                            &mut self.my_role,
-                            &mut self.nym_did,
-                            &mut self.trustee_did,
-                            &mut self.did_version,
-                        );
+                        ui.heading("Publish Tool");
+                        ui.separator();
+                        if self.picked_path.is_some() && self.wallet.is_some() {
+                            // connect to the ledger
+                            self.ledgers = Some(block_on(IndyLedger::new(self.picked_path.clone().unwrap())));
+                            publish_tool_ui(ui, &mut self.wallet, &mut self.publish_option, &mut self.nym_role, &mut self.nym_info, &mut self.picked_path, &mut self.ledgers, &mut self.txn_result,  &mut self.schema_info, &mut self.txn, &mut self.signed_txn_result).expect("Something went wrong with the publish tool");
+                        } else {
+                            ui.label("Please select a genesis file and create a wallet first");}
+
                     });
             }
         });
