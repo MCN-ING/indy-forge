@@ -118,3 +118,90 @@ pub async fn register_nym(
 //         }
 //     }
 // }
+
+// -- Region Test Section --
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use indy_data_types::keys::KeyType;
+    use serde_json::json;
+
+    #[test]
+    fn test_create_did_sov() {
+        let seed = "000000000000000000000000Trustee1".to_string();
+        let version = 1;
+        let result = create_did(seed, version);
+
+        assert!(result.is_ok());
+
+        let did_info = result.unwrap();
+        assert_eq!(did_info.did.to_string(), "V4SGRU86Z58d6TV7PBUe6f");
+        assert_eq!(
+            did_info.verkey,
+            "GJ1SzoWzavQYfNL9XkaJdrQejfztN4XqdsiV4ct3LXKL"
+        );
+        assert!(matches!(did_info.privatekey.alg, KeyType::ED25519));
+    }
+
+    #[test]
+    fn test_create_did_indy() {
+        let seed = "000000000000000000000000Trustee1".to_string();
+        let version = 2;
+        let result = create_did(seed, version);
+
+        assert!(result.is_ok());
+
+        let did_info = result.unwrap();
+        assert_eq!(did_info.did.to_string(), "GAAguaTbEHjvxL6i64YmAo");
+        assert_eq!(
+            did_info.verkey,
+            "GJ1SzoWzavQYfNL9XkaJdrQejfztN4XqdsiV4ct3LXKL"
+        );
+        assert!(matches!(did_info.privatekey.alg, KeyType::ED25519));
+    }
+
+    #[test]
+    fn test_sign_transaction() {
+        // Create mock DidInfo
+        let did_info = create_did("000000000000000000000000Trustee1".to_string(), 2);
+        assert!(did_info.is_ok());
+        let did_info = did_info.unwrap();
+
+        // Create mock transaction
+        let txn = json!({
+            "identifier": "Bhhsxc585EVgbbmosZr65J",
+            "operation": {
+                "dest": "VsKV7grR1BUE29mG2Fm2kX",
+                "role": "101",
+                "type": "1",
+                "verkey": "GjZWsBLgZCR18aL468JAT7w9CZRiBnpxUPPgyQxh4voa"
+            },
+            "protocolVersion": 2,
+            "reqId": 1689080604840377700i64
+        });
+        // Call sign_transaction
+        let result = sign_transaction(did_info, serde_json::to_string(&txn).unwrap());
+        // Assert function returns Ok
+        assert!(result.is_ok());
+
+        // Assert the result matches the expected signed transaction
+        // Note: The expected signed transaction is a placeholder. Replace it with the actual expected signed transaction.
+        let expected_signed_transaction = json!({
+            "identifier": "Bhhsxc585EVgbbmosZr65J",
+            "operation": {
+                "dest": "VsKV7grR1BUE29mG2Fm2kX",
+                "role": "101",
+                "type": "1",
+                "verkey": "GjZWsBLgZCR18aL468JAT7w9CZRiBnpxUPPgyQxh4voa"
+            },
+            "protocolVersion": 2,
+            "reqId": 1689080604840377700i64,
+            "signatures": {
+                "GAAguaTbEHjvxL6i64YmAo": "5xtuhdLH1iZvNVeeAr5yuQD9RBsZ17zW5iwTqyxrWk89LaYpkLRGg3juuyiJNgwnSHMNq7nfXPx8AMvhfvHnXVQX"
+            }
+        });
+        assert_eq!(result.unwrap(), expected_signed_transaction);
+    }
+}
+
+// -- End Region Test Section --
