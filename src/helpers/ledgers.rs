@@ -1,6 +1,5 @@
 use crate::app::NymInfo;
 use crate::helpers::wallet::IndyWallet;
-use indy_data_types::anoncreds::cred_def::CredentialDefinition;
 use indy_data_types::anoncreds::schema::Schema;
 use indy_data_types::did::DidValue;
 use indy_vdr::common::error::VdrResult;
@@ -10,12 +9,6 @@ use indy_vdr::pool::helpers::perform_ledger_request;
 use indy_vdr::pool::{
     LocalPool, Pool, PoolBuilder, PoolTransactions, PreparedRequest, RequestResult,
 };
-use serde_json::{json, Value};
-
-pub enum Ledgers {
-    Indy,
-    Besu,
-}
 
 #[derive(Clone)]
 pub struct IndyLedger {
@@ -32,24 +25,24 @@ impl IndyLedger {
         IndyLedger { pool }
     }
 
-    pub async fn publish_cred_def(
-        &self,
-        wallet: &IndyWallet,
-        submitter_did: &str,
-        cred_def: &CredentialDefinition,
-    ) -> VdrResult<String> {
-        // hack to clone cred def
-        let cred_def_json = json!(cred_def).to_string();
-        let cred_def = serde_json::from_str(&cred_def_json).unwrap();
-
-        let mut request = self
-            .pool
-            .get_request_builder()
-            .build_cred_def_request(&DidValue(submitter_did.to_string()), cred_def)
-            .unwrap();
-
-        self._sign_and_submit_request(wallet, &mut request).await
-    }
+    // pub async fn publish_cred_def(
+    //     &self,
+    //     wallet: &IndyWallet,
+    //     submitter_did: &str,
+    //     cred_def: &CredentialDefinition,
+    // ) -> VdrResult<String> {
+    //     // hack to clone cred def
+    //     let cred_def_json = json!(cred_def).to_string();
+    //     let cred_def = serde_json::from_str(&cred_def_json).unwrap();
+    //
+    //     let mut request = self
+    //         .pool
+    //         .get_request_builder()
+    //         .build_cred_def_request(&DidValue(submitter_did.to_string()), cred_def)
+    //         .unwrap();
+    //
+    //     self._sign_and_submit_request(wallet, &mut request).await
+    // }
     pub async fn publish_schema(
         &self,
         wallet: &IndyWallet,

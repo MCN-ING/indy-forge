@@ -1,6 +1,4 @@
 use aries_askar::kms::{KeyAlg, LocalKey};
-use indy_data_types::did::{generate_did, DidValue};
-use indy_data_types::keys::PrivateKey;
 use sha2::{Digest, Sha256};
 
 pub struct IndyWallet {

@@ -1,6 +1,6 @@
 use crate::app::DIDVersion;
 use crate::helpers::wallet::IndyWallet;
-use egui::{Button, Label, TextEdit, Ui};
+use egui::{Button, TextEdit, Ui};
 use futures_executor::block_on;
 use rfd::FileDialog;
 

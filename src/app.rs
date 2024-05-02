@@ -1,10 +1,5 @@
-use egui::Align2;
 use serde::{Deserialize, Serialize};
-
 use futures_executor::block_on;
-
-
-use crate::helper::DidInfo;
 use crate::helpers::ledgers::IndyLedger;
 use crate::helpers::wallet::IndyWallet;
 use crate::indorser::endorser_tool;
@@ -71,15 +66,12 @@ pub struct TemplateApp {
     tool_visibility: ToolVisibility,
     picked_path: Option<String>,
     nym_role: MyRoles,
-    nym_did: DidInfo,
-    trustee_did: DidInfo,
     did_version: DIDVersion,
     wallet: Option<IndyWallet>,
     publish_option: String,
     nym_info: NymInfo,
     ledgers: Option<IndyLedger>,
     txn_result: String,
-    txn_publish: String,
     schema_info: SchemaInfo,
 }
 
@@ -98,8 +90,6 @@ impl Default for TemplateApp {
             },
             picked_path: Default::default(),
             nym_role: Default::default(),
-            nym_did: Default::default(),
-            trustee_did: Default::default(),
             did_version: DIDVersion::Indy,
             wallet: None,
             publish_option: "".to_owned(),
@@ -110,7 +100,6 @@ impl Default for TemplateApp {
             },
             ledgers: None,
             txn_result: "".to_owned(),
-            txn_publish: "".to_owned(),
             schema_info: SchemaInfo {
                 schema_name: "".to_owned(),
                 schema_version: "".to_owned(),
