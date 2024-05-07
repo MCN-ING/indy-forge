@@ -104,7 +104,6 @@ impl IndyLedger {
         let sig_bytes = request.get_signature_input()?;
         let signature = wallet.sign(sig_bytes.as_bytes()).await;
         request.set_signature(&signature)?;
-        println!("Request2: {:?}", request.req_json.to_string());
         self._submit_request(request).await
     }
 
