@@ -17,9 +17,12 @@ Tool for endorsing(signing) an Indy Node transactions
 The [endorser-tool](https://github.com/andrewwhitehead/endorser-tool) from Andrew Whitehead was the inspiration for this
 project.
 
-## NYM Creation Tool
+## Publishing Tool
 
-Tool for registering a new NYM and it's role on the Indy Ledger
+Tool that can currently publish a custom transaction(like one created with the endorser tool), a simple schema created
+from the gui, or(upcoming) a cre_def on the Indy Ledger
+
+It can also register a new NYM and it's role(currently Trustee, NetworkMonitor and Endorser)) on the Indy Ledger
 
 ## Getting started
 
