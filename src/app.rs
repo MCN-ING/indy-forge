@@ -11,6 +11,7 @@ pub enum MyRoles {
     Endorser = 101,
     NetworkMonitor = 201,
     Steward = 2,
+    Trustee = 0,
 }
 
 pub struct SchemaInfo {

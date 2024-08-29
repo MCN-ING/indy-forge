@@ -4,7 +4,7 @@ version = "0.5.0"
 authors = ["Sylvain Martel <sylvain.martel10@mcn.gouv.qc.ca>"]
 edition = "2021"
 include = ["LICENSE-APACHE", "LICENSE-MIT", "**/*.rs", "Cargo.toml"]
-rust-version = "1.76"
+rust-version = "1.80.1"
 
 [package.metadata.docs.rs]
 all-features = true
@@ -30,7 +30,7 @@ derive_more = "0.99"
 
 # Indy
 indy-data-types = "0.7.1"
-indy-vdr = { git = "https://github.com/hyperledger/indy-vdr.git" }
+indy-vdr = { git = "https://github.com/SylvainMartel/indy-vdr.git" }
 getrandom = { version = "0.2", features = ["js"] }
 
 # Wallet
