@@ -250,6 +250,7 @@ pub fn publish_tool_ui(
                 ui.selectable_value(&mut *nym_role, MyRoles::Endorser, "Endorser");
                 ui.selectable_value(&mut *nym_role, MyRoles::NetworkMonitor, "Network Monitor");
                 ui.selectable_value(&mut *nym_role, MyRoles::Steward, "Steward");
+                ui.selectable_value(&mut *nym_role, MyRoles::Trustee, "Trustee");
             });
 
         // Check each field and add the name of the missing fields to a vector
@@ -290,6 +291,7 @@ pub fn publish_tool_ui(
                     MyRoles::Endorser => UpdateRole::Set(LedgerRole::Endorser),
                     MyRoles::NetworkMonitor => UpdateRole::Set(LedgerRole::NetworkMonitor),
                     MyRoles::Steward => UpdateRole::Set(LedgerRole::Steward),
+                    MyRoles::Trustee => UpdateRole::Set(LedgerRole::Trustee),
                 };
                 if let Some(ledger) = ledgers {
                     match block_on(IndyLedger::publish_nym(
