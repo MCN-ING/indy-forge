@@ -174,7 +174,20 @@ pub fn publish_tool_ui(
                         transaction_options,
                     )) {
                         Ok(result) => {
+                            // Store only the raw transaction JSON
                             *txn_result = result;
+
+                            // Display additional context in the UI only
+                            ui.label(if transaction_options.send {
+                                "Schema transaction submitted successfully:"
+                            } else if transaction_options.sign {
+                                "Signed schema transaction (not submitted):"
+                            } else {
+                                "Unsigned schema transaction:"
+                            });
+
+                            // Display the formatted transaction
+                            ui.monospace(&*txn_result);
                         }
                         Err(e) => {
                             *txn_result = e.to_string();
@@ -321,22 +334,24 @@ pub fn publish_tool_ui(
                     transaction_options,
                 )) {
                     Ok(result) => {
+                        // Store only the raw transaction JSON in txn_result
+                        *txn_result = result;
+
+                        // Display additional context in the UI only
+                        ui.label(if transaction_options.send {
+                            "Transaction submitted successfully:"
+                        } else if transaction_options.sign {
+                            "Signed transaction (not submitted):"
+                        } else {
+                            "Unsigned transaction:"
+                        });
+
+                        // Display the formatted transaction
+                        ui.monospace(&*txn_result);
+
                         if transaction_options.send {
-                            *txn_result =
-                                format!("Transaction submitted successfully:\n{}", result);
-                            // Clear fields only if sent
                             nym_info.did.clear();
                             nym_info.verkey.clear();
-                        } else {
-                            *txn_result = format!(
-                                "Prepared {} transaction:\n{}",
-                                if transaction_options.sign {
-                                    "and signed"
-                                } else {
-                                    "unsigned"
-                                },
-                                result
-                            );
                         }
                     }
                     Err(e) => {
@@ -346,13 +361,31 @@ pub fn publish_tool_ui(
             }
         }
     }
-    ui.separator();
-    ui.label("Result:");
-    ui.monospace(format!("{:?}", txn_result));
-
     // Add copy button for the transaction result
-    if !txn_result.is_empty() && ui.button("📋 Copy Transaction").clicked() {
-        ui.output_mut(|o| o.copied_text = txn_result.clone());
+    ui.separator();
+    // Clone once at the start before any usage
+    let txn_display = txn_result.clone();
+
+    if !txn_display.is_empty() {
+        if !txn_display.starts_with("Error:") {
+            // Show context in the UI
+            ui.label(if transaction_options.send {
+                "Submitted transaction:"
+            } else {
+                "Prepared transaction:"
+            });
+
+            // Display the transaction
+            ui.monospace(&txn_display);
+
+            // Use the same cloned value for copying
+            if ui.button("📋 Copy Transaction").clicked() {
+                ui.output_mut(|o| o.copied_text = txn_display.clone());
+            }
+        } else {
+            // If it's an error, display it as is
+            ui.colored_label(egui::Color32::RED, &txn_display);
+        }
     }
     Ok(())
 }
