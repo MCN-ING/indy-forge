@@ -1,11 +1,9 @@
-# Mac stuff:
-.DS_Store
-
 # trunk output folder
 dist
 
 # Rust compile target directories:
-target
+debug/
+target/
 target_ra
 target_wasm
 
@@ -15,3 +13,15 @@ target_wasm
 
 # just in case...
 *pool_transactions*
+
+# eframe storage directories
+.local/share/indyforge/
+%APPDATA%/indyforge/
+Library/Application Support/indyforge/
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+
+# Development files
+*.log

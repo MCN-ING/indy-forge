@@ -3,7 +3,7 @@ use crate::helpers::ledgers::IndyLedger;
 use crate::helpers::wallet::IndyWallet;
 use crate::indorser::endorser_tool;
 use crate::publish_tool::publish_tool_ui;
-use crate::wallet_tool::create_wallet_ui;
+use crate::wallet_tool::{create_wallet_ui, RecentUrls};
 use egui::TextBuffer;
 use futures_executor::block_on;
 use serde::{Deserialize, Serialize};
@@ -101,6 +101,7 @@ pub struct TemplateApp {
     current_genesis_path: Option<String>,
     connection_start_time: Option<std::time::Instant>,
     transaction_options: TransactionOptions,
+    recent_urls: RecentUrls,
 }
 
 impl Default for TemplateApp {
@@ -143,32 +144,35 @@ impl Default for TemplateApp {
             current_genesis_path: None,
             connection_start_time: None,
             transaction_options: TransactionOptions::default(),
+            recent_urls: RecentUrls::new(10),
         }
     }
 }
 
 impl TemplateApp {
     /// Called once before the first frame.
-    pub fn new(_cc: &eframe::CreationContext<'_>) -> Self {
+    pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
         // This is also where you can customize the look and feel of egui using
         // `cc.egui_ctx.set_visuals` and `cc.egui_ctx.set_fonts`.
 
         // Load previous app state (if any).
         // Note that you must enable the `persistence` feature for this to work.
-        // if let Some(storage) = cc.storage {
-        //     return eframe::get_value(storage, eframe::APP_KEY).unwrap_or_default();
-        // }
+        if let Some(storage) = cc.storage {
+            if let Some(urls_json) = storage.get_string("recent_urls") {
+                if let Ok(recent_urls) = serde_json::from_str(&urls_json) {
+                    return Self {
+                        recent_urls,
+                        ..Default::default()
+                    };
+                }
+            }
+        }
 
         Default::default()
     }
 }
 
 impl eframe::App for TemplateApp {
-    /// Called by the frame work to save state before shutdown.
-    // fn save(&mut self, storage: &mut dyn eframe::Storage) {
-    //     eframe::set_value(storage, eframe::APP_KEY, self);
-    // }
-
     /// Called each time the UI needs repainting, which may be many times per second.
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         // Put your widgets into a `SidePanel`, `TopBottomPanel`, `CentralPanel`, `Window` or `Area`.
@@ -236,7 +240,14 @@ impl eframe::App for TemplateApp {
                     ui.heading("Wallet Tool");
                     ui.separator();
                     ui.label("Tool that create a temporary wallet and hold the DID used by the other tools");
-                    create_wallet_ui(ui, &mut self.trustee_seed, &mut self.wallet, &mut self.genesis_source, &mut self.did_version,  &mut self.genesis_url_input,).expect("Something went wrong with the wallet creation");
+                    create_wallet_ui(ui,
+                                     &mut self.trustee_seed,
+                                     &mut self.wallet,
+                                     &mut self.genesis_source,
+                                     &mut self.did_version,
+                                     &mut self.genesis_url_input,
+                                     &mut self.recent_urls,)
+                        .expect("Something went wrong with the wallet creation");
                 });
             }
             if self.tool_visibility.show_publish_tool {
@@ -465,6 +476,20 @@ impl eframe::App for TemplateApp {
                     });
             }
         });
+    }
+
+    /// Called by the frame work to save state before shutdown.
+    // fn save(&mut self, storage: &mut dyn eframe::Storage) {
+    //     eframe::set_value(storage, eframe::APP_KEY, self);
+    // }
+
+    fn save(&mut self, storage: &mut dyn eframe::Storage) {
+        if !cfg!(test) {
+            // Don't save during tests
+            if let Ok(urls_json) = serde_json::to_string(&self.recent_urls) {
+                storage.set_string("recent_urls", urls_json);
+            }
+        }
     }
 }
 
