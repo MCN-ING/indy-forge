@@ -1,6 +1,11 @@
-on: [ pull_request, workflow_dispatch ]
-
 name: CI
+
+on:
+  pull_request:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'  # This will trigger on any tag starting with 'v'
 
 env:
   RUSTFLAGS: -D warnings --cfg=web_sys_unstable_apis
@@ -71,6 +76,7 @@ jobs:
           args: -- -D warnings
 
   build:
+    name: Build
     needs: [ check, test, fmt, clippy ]
     runs-on: ${{ matrix.os }}
     strategy:
@@ -88,6 +94,10 @@ jobs:
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
             extension: ""
+
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            extension: .exe
 
     steps:
       - name: Building ${{ matrix.target }}
@@ -111,29 +121,78 @@ jobs:
         if: runner.os == 'macOS'
         run: brew install cmake
 
+      - name: Install Windows dependencies
+        if: runner.os == 'Windows'
+        run: |
+          vcpkg install openssl:x64-windows-static
+          echo "OPENSSL_DIR=C:/vcpkg/installed/x64-windows-static" >> $GITHUB_ENV
+          echo "OPENSSL_STATIC=1" >> $GITHUB_ENV
+
       - uses: actions-rs/cargo@v1
         with:
           command: build
           args: --verbose --release --target=${{ matrix.target }}
 
       - name: Prepare artifacts
+        shell: bash
         run: |
-          mkdir artifacts
+          mkdir -p artifacts
           cp target/${{ matrix.target }}/release/indyforge${{ matrix.extension }} artifacts/indyforge-${{ matrix.target }}${{ matrix.extension }}
+          cd artifacts
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            certutil -hashfile indyforge-${{ matrix.target }}${{ matrix.extension }} SHA256 > indyforge-${{ matrix.target }}.sha256
+          else
+            sha256sum indyforge-${{ matrix.target }}${{ matrix.extension }} > indyforge-${{ matrix.target }}.sha256
+          fi
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v3
         with:
           name: indyforge-${{ matrix.target }}
-          path: artifacts/indyforge-${{ matrix.target }}${{ matrix.extension }}
+          path: |
+            artifacts/indyforge-${{ matrix.target }}${{ matrix.extension }}
+            artifacts/indyforge-${{ matrix.target }}.sha256
           if-no-files-found: error
 
-      - name: Upload Release
-        if: startsWith(github.ref, 'refs/tags/')
-        uses: svenstaro/upload-release-action@v2
+  create-release:
+    name: Create Release
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v3
         with:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: artifacts/indyforge-${{ matrix.target }}${{ matrix.extension }}
-          asset_name: indyforge-${{ matrix.target }}${{ matrix.extension }}
-          tag: ${{ github.ref }}
-          overwrite: true
+          path: artifacts
+
+      - name: Prepare release assets
+        run: |
+          mkdir release-assets
+          find artifacts -type f -exec cp {} release-assets/ \;
+          cd release-assets
+          sha256sum * > SHA256SUMS
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            release-assets/*
+          generate_release_notes: true
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  notify:
+    name: Notify
+    needs: create-release
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+      - name: Send notification
+        run: |
+          echo "Release ${{ github.ref_name }} has been published successfully!"
+          echo "Visit https://github.com/${{ github.repository }}/releases/tag/${{ github.ref_name }}"

@@ -12,17 +12,18 @@ for the web, and share it using Github Pages.~~ See [issue #1](https://github.co
 
 ## Endorser Tool
 
-Tool for endorsing(signing) an Indy Node transactions
+Tool for endorsing (signing) Indy Node transactions.
 
 The [endorser-tool](https://github.com/andrewwhitehead/endorser-tool) from Andrew Whitehead was the inspiration for this
 project.
 
 ## Publishing Tool
 
-Tool that can currently publish a custom transaction(like one created with the endorser tool), a simple schema created
-from the gui, or(upcoming) a cre_def on the Indy Ledger
-
-It can also register a new NYM and it's role(currently Trustee, NetworkMonitor and Endorser)) on the Indy Ledger
+- Custom transaction publishing
+- Schema creation and publishing
+- NYM registration with role management
+- Genesis file management with previewing capabilities
+- Real-time connection status monitoring
 
 ## Getting started
 
@@ -45,6 +46,13 @@ On Fedora Rawhide you need to run:
 ### Web Locally
 
 Sadly, for the moment, the zmq library is preventing a webassembly build.
+
+### DID Implementation
+
+- Supports both DID:SOV (v1) and DID:INDY (v2)
+- DID:INDY generation uses SHA256(verkey) with base58 encoding
+- Comprehensive validation of DID-verkey relationships
+- Cross-validated cryptographic operations
 
 ## À propos
 
