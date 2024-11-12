@@ -2,7 +2,7 @@
 
 # Indy Forge
 
-[![img](https://img.shields.io/badge/Version-0.4.0-blue)](
+[![img](https://img.shields.io/badge/Version-0.7.0-blue)](
 
 ## About
 
