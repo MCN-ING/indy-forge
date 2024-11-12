@@ -1,4 +1,5 @@
 use crate::app::{MyRoles, NymInfo, SchemaInfo};
+use crate::helpers::genesis::GenesisSource;
 use crate::helpers::ledgers::IndyLedger;
 use crate::helpers::wallet::IndyWallet;
 use derive_more::Display;
@@ -28,7 +29,7 @@ pub fn publish_tool_ui(
     publish_option: &mut String,
     nym_role: &mut MyRoles,
     nym_info: &mut NymInfo,
-    picked_path: &mut Option<String>,
+    genesis_source: &mut Option<GenesisSource>,
     ledgers: &mut Option<IndyLedger>,
     txn_result: &mut String,
     schema_info: &mut SchemaInfo,
@@ -139,7 +140,7 @@ pub fn publish_tool_ui(
                 Ok(_) => ui.label("The schema seems valid."),
                 Err(e) => ui.label(format!("Invalid schema: {} ", e)),
             };
-            if ui.button("Register Schema").clicked() && picked_path.is_some() {
+            if ui.button("Register Schema").clicked() && genesis_source.is_some() {
                 ui.label("Registering Schema...");
 
                 let wallet_ref = wallet.as_ref().unwrap();
@@ -247,6 +248,7 @@ pub fn publish_tool_ui(
         egui::ComboBox::from_id_source("my_role_nym")
             .selected_text(format!("{:?}", nym_role))
             .show_ui(ui, |ui| {
+                ui.selectable_value(&mut *nym_role, MyRoles::Author, "Author");
                 ui.selectable_value(&mut *nym_role, MyRoles::Endorser, "Endorser");
                 ui.selectable_value(&mut *nym_role, MyRoles::NetworkMonitor, "Network Monitor");
                 ui.selectable_value(&mut *nym_role, MyRoles::Steward, "Steward");
@@ -261,7 +263,7 @@ pub fn publish_tool_ui(
         if nym_info.verkey.is_empty() || !is_valid_verkey.is_ok() {
             missing_fields.push("NYM Verkey");
         }
-        if picked_path.is_none() {
+        if genesis_source.is_none() {
             missing_fields.push("genesis file");
         }
 
@@ -282,12 +284,13 @@ pub fn publish_tool_ui(
             if ui.button("Register Nym").clicked()
                 && is_valid_did.is_ok()
                 && is_valid_verkey.is_ok()
-                && picked_path.is_some()
+                && genesis_source.is_some()
             {
                 ui.label("Registering NYM...");
 
                 let wallet_ref = wallet.as_ref().unwrap();
                 let role = match nym_role {
+                    MyRoles::Author => UpdateRole::Reset,
                     MyRoles::Endorser => UpdateRole::Set(LedgerRole::Endorser),
                     MyRoles::NetworkMonitor => UpdateRole::Set(LedgerRole::NetworkMonitor),
                     MyRoles::Steward => UpdateRole::Set(LedgerRole::Steward),
@@ -319,4 +322,69 @@ pub fn publish_tool_ui(
     ui.label("Result:");
     ui.monospace(format!("{:?}", txn_result));
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::app::MyRoles;
+    use indy_vdr::ledger::{constants, RequestBuilder};
+    use indy_vdr::pool::ProtocolVersion;
+    use serde_json::json;
+
+    #[test]
+    fn test_author_role_mapping() -> anyhow::Result<()> {
+        // First test the enum mapping
+        let role = match MyRoles::Author {
+            MyRoles::Author => UpdateRole::Reset,
+            _ => panic!("Wrong role mapping"),
+        };
+        assert_eq!(role, UpdateRole::Reset);
+
+        // Create request builder directly
+        let request_builder = RequestBuilder::new(ProtocolVersion::default());
+        let submitter_did = DidValue("V4SGRU86Z58d6TV7PBUe6f".to_string());
+        let target_did = DidValue("7RR5ZhPkxRnNFsV6uhNDfq".to_string());
+
+        let request = request_builder.build_nym_request(
+            &submitter_did,
+            &target_did,
+            None, // no verkey
+            None, // no alias
+            Some(UpdateRole::Reset),
+            None,
+            None,
+        )?;
+
+        // Check that the operation contains null role as shown in the indy-vdr test
+        let expected_operation = json!({
+            "type": constants::NYM,
+            "dest": target_did.to_string(),
+            "role": serde_json::Value::Null,
+        });
+
+        let request_json: serde_json::Value = serde_json::from_str(&request.req_json.to_string())?;
+
+        // Test the role specifically
+        assert_eq!(
+            request_json["operation"]["role"],
+            serde_json::Value::Null,
+            "Role should be null for Author"
+        );
+
+        // Test the complete operation matches expected format
+        let operation = &request_json["operation"];
+        assert_eq!(
+            operation["type"],
+            constants::NYM,
+            "Transaction type should be NYM"
+        );
+        assert_eq!(
+            operation["dest"],
+            target_did.to_string(),
+            "Destination DID should match"
+        );
+
+        Ok(())
+    }
 }
