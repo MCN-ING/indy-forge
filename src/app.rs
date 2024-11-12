@@ -458,7 +458,6 @@ impl eframe::App for TemplateApp {
                                     &mut self.txn_result,
                                     &mut self.schema_info,
                                     &mut self.txn,
-                                    &mut self.signed_txn_result,
                                     &mut self.transaction_options,
                                 ).expect("Failed to render publish tool UI");
                             }
