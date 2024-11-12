@@ -357,7 +357,7 @@ mod tests {
         )?;
 
         // Check that the operation contains null role as shown in the indy-vdr test
-        let expected_operation = json!({
+        let _expected_operation = json!({
             "type": constants::NYM,
             "dest": target_did.to_string(),
             "role": serde_json::Value::Null,

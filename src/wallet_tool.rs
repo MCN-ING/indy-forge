@@ -40,9 +40,17 @@ pub fn create_wallet_ui(
             DIDVersion::Sov => 1,
             DIDVersion::Indy => 2,
         };
-        let new_wallet = block_on(IndyWallet::new(Some(&seed), did_version_value));
-
-        *wallet = Some(new_wallet.unwrap());
+        match block_on(IndyWallet::new(Some(&seed), did_version_value)) {
+            Ok(new_wallet) => {
+                *wallet = Some(new_wallet);
+            }
+            Err(e) => {
+                ui.colored_label(
+                    egui::Color32::RED,
+                    format!("Failed to create wallet: {}", e),
+                );
+            }
+        }
     }
 
     if let Some(wallet) = wallet {
