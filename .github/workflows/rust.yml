@@ -136,14 +136,17 @@ jobs:
       - name: Prepare artifacts
         shell: bash
         run: |
-          mkdir -p artifacts
-          cp target/${{ matrix.target }}/release/indyforge${{ matrix.extension }} artifacts/indyforge-${{ matrix.target }}${{ matrix.extension }}
-          cd artifacts
-          if [[ "$RUNNER_OS" == "Windows" ]]; then
-            certutil -hashfile indyforge-${{ matrix.target }}${{ matrix.extension }} SHA256 > indyforge-${{ matrix.target }}.sha256
-          else
-            sha256sum indyforge-${{ matrix.target }}${{ matrix.extension }} > indyforge-${{ matrix.target }}.sha256
-          fi
+          |
+           mkdir -p artifacts
+           cp target/${{ matrix.target }}/release/indyforge${{ matrix.extension }} artifacts/indyforge-${{ matrix.target }}${{ matrix.extension }}
+           cd artifacts
+           if [[ "$RUNNER_OS" == "Windows" ]]; then
+             certutil -hashfile indyforge-${{ matrix.target }}${{ matrix.extension }} SHA256 > indyforge-${{ matrix.target }}.sha256
+           elif [[ "$RUNNER_OS" == "macOS" ]]; then
+             shasum -a 256 indyforge-${{ matrix.target }}${{ matrix.extension }} > indyforge-${{ matrix.target }}.sha256
+           else
+             sha256sum indyforge-${{ matrix.target }}${{ matrix.extension }} > indyforge-${{ matrix.target }}.sha256
+           fi
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v3
