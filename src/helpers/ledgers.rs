@@ -169,10 +169,11 @@ impl IndyLedger {
     }
 
     // function to only send a transaction that is already signed
-    pub async fn write_signed_transaction_to_ledger(
+    pub async fn prepare_transaction(
         &self,
         wallet: &IndyWallet,
         signed_txn: &mut String,
+        options: &TransactionOptions,
     ) -> VdrResult<String> {
         let mut req = PreparedRequest::from_request_json(signed_txn)?;
 
@@ -186,54 +187,53 @@ impl IndyLedger {
             )
         })?;
 
-        // If the transaction already has signatures, submit as is
-        if req_json.contains_key("signatures") {
-            return self._submit_request(&req).await;
-        }
-
-        // Don't try to modify transactions that already have a signature
-        if req_json.contains_key("signature") {
-            return Err(VdrError::new(
-                VdrErrorKind::Input,
-                Some("Transaction uses legacy single signature format. Please use multi-signature format.".to_string()),
-                None
-            ));
-        }
-
-        // Get the operation type to validate the request
-        // let operation = req_json
-        //     .get("operation")
-        //     .and_then(|op| op.as_object())
-        //     .and_then(|op| op.get("type"))
-        //     .and_then(|t| t.as_str())
-        //     .ok_or_else(|| {
-        //         VdrError::new(
-        //             VdrErrorKind::Input,
-        //             Some("Missing or invalid operation type in request".to_string()),
-        //             None,
-        //         )
-        //     })?;
-
-        // Sign the transaction using multi-signature format
-        match req.get_signature_input() {
-            Ok(sig_bytes) => {
-                let signature = wallet.sign(sig_bytes.as_bytes()).await;
-                req.set_multi_signature(&DidValue(wallet.did.clone()), &signature)
-                    .map_err(|e| {
-                        VdrError::new(
-                            VdrErrorKind::Input,
-                            Some("Failed to add multi-signature to request".to_string()),
-                            Some(Box::new(e)),
-                        )
-                    })?;
-            }
-            Err(e) => {
+        if options.sign {
+            if req_json.contains_key("signatures") {
                 return Err(VdrError::new(
                     VdrErrorKind::Input,
-                    Some("Failed to get signature input from request".to_string()),
-                    Some(Box::new(e)),
+                    Some("Transaction already has signatures".to_string()),
+                    None,
                 ));
             }
+
+            if req_json.contains_key("signature") {
+                return Err(VdrError::new(
+                    VdrErrorKind::Input,
+                    Some("Transaction uses legacy single signature format. Please use multi-signature format.".to_string()),
+                    None,
+                ));
+            }
+
+            match req.get_signature_input() {
+                Ok(sig_bytes) => {
+                    let signature = wallet.sign(sig_bytes.as_bytes()).await;
+                    req.set_multi_signature(&DidValue(wallet.did.clone()), &signature)
+                        .map_err(|e| {
+                            VdrError::new(
+                                VdrErrorKind::Input,
+                                Some("Failed to add multi-signature to request".to_string()),
+                                Some(Box::new(e)),
+                            )
+                        })?;
+                }
+                Err(e) => {
+                    return Err(VdrError::new(
+                        VdrErrorKind::Input,
+                        Some("Failed to get signature input from request".to_string()),
+                        Some(Box::new(e)),
+                    ));
+                }
+            }
+        }
+
+        if !options.send {
+            return serde_json::to_string_pretty(&req.req_json).map_err(|e| {
+                VdrError::new(
+                    VdrErrorKind::Input,
+                    Some(format!("Failed to serialize transaction: {}", e)),
+                    None,
+                )
+            });
         }
 
         self._submit_request(&req).await

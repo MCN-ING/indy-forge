@@ -34,7 +34,6 @@ pub fn publish_tool_ui(
     txn_result: &mut String,
     schema_info: &mut SchemaInfo,
     txn: &mut String,
-    signed_txn_result: &mut Option<String>,
     transaction_options: &mut TransactionOptions,
 ) -> anyhow::Result<()> {
     ui.label("Publish something on a ledger");
@@ -202,41 +201,48 @@ pub fn publish_tool_ui(
         ui.heading("Custom txn registration");
         ui.separator();
 
+        ui.colored_label(
+            egui::Color32::from_rgb(144, 238, 144),
+            "Paste your transaction below",
+        );
+
         ui.add(
             egui::TextEdit::multiline(txn)
-                .hint_text("Input Signed Transaction")
+                .hint_text("Input Transaction")
                 .desired_width(f32::INFINITY),
         );
         ui.separator();
-        if ui.button("Register Custom Txn").clicked() {
-            match block_on(IndyLedger::write_signed_transaction_to_ledger(
-                ledgers.as_ref().unwrap(),
-                wallet.as_ref().unwrap(),
-                txn,
-            )) {
-                Ok(result) => {
-                    *txn_result = result;
-                }
-                Err(e) => {
-                    *txn_result = e.to_string();
+
+        // Add explanation of current options before preparation
+        if !transaction_options.sign && !transaction_options.send {
+            ui.colored_label(
+                egui::Color32::YELLOW,
+                "Transaction will be prepared without signing",
+            );
+        } else if !transaction_options.send {
+            ui.colored_label(
+                egui::Color32::LIGHT_GREEN,
+                "Transaction will be signed but not sent",
+            );
+        }
+
+        if ui.button("Prepare Custom Transaction").clicked() {
+            if let Some(ledger) = ledgers {
+                match block_on(ledger.prepare_transaction(
+                    wallet.as_ref().unwrap(),
+                    txn,
+                    transaction_options,
+                )) {
+                    Ok(result) => {
+                        *txn_result = result;
+                    }
+                    Err(e) => {
+                        *txn_result = format!("Error: {}", e);
+                    }
                 }
             }
         }
 
-        ui.vertical(|ui| {
-            ui.label("Signed Transaction:");
-            if let Some(result) = &signed_txn_result {
-                // ui.colored_label(egui::Color32::GREEN, "Signed Transaction:");
-                ui.colored_label(egui::Color32::GREEN, result.clone());
-
-                ui.separator();
-                // Add a button to copy the unescaped_json content
-                if ui.button("Copy output").clicked() {
-                    let r = result.clone();
-                    ui.output_mut(|o| o.copied_text = r);
-                };
-            }
-        });
         ui.separator();
 
         //endregion
@@ -364,27 +370,49 @@ pub fn publish_tool_ui(
     // Add copy button for the transaction result
     ui.separator();
     // Clone once at the start before any usage
-    let txn_display = txn_result.clone();
 
-    if !txn_display.is_empty() {
-        if !txn_display.starts_with("Error:") {
-            // Show context in the UI
-            ui.label(if transaction_options.send {
-                "Submitted transaction:"
-            } else {
-                "Prepared transaction:"
-            });
+    if !txn_result.is_empty() {
+        ui.separator();
+        if !txn_result.starts_with("Error:") {
+            let status_message = match publish_option.as_str() {
+                "Nym" => {
+                    if transaction_options.send {
+                        "NYM transaction submitted successfully:"
+                    } else if transaction_options.sign {
+                        "Signed NYM transaction (not submitted):"
+                    } else {
+                        "Prepared NYM transaction (unsigned):"
+                    }
+                }
+                "Schema" => {
+                    if transaction_options.send {
+                        "Schema transaction submitted successfully:"
+                    } else if transaction_options.sign {
+                        "Signed schema transaction (not submitted):"
+                    } else {
+                        "Prepared schema transaction (unsigned):"
+                    }
+                }
+                "Custom" => {
+                    if transaction_options.send {
+                        "Transaction submitted successfully:"
+                    } else if transaction_options.sign {
+                        "Signed transaction (not submitted):"
+                    } else {
+                        "Prepared transaction (unsigned):"
+                    }
+                }
+                _ => "Transaction result:",
+            };
 
-            // Display the transaction
-            ui.monospace(&txn_display);
+            ui.label(status_message);
+            ui.monospace(&*txn_result);
 
-            // Use the same cloned value for copying
             if ui.button("📋 Copy Transaction").clicked() {
-                ui.output_mut(|o| o.copied_text = txn_display.clone());
+                ui.output_mut(|o| o.copied_text = txn_result.clone());
             }
         } else {
-            // If it's an error, display it as is
-            ui.colored_label(egui::Color32::RED, &txn_display);
+            ui.colored_label(egui::Color32::RED, &*txn_result);
         }
     }
     Ok(())

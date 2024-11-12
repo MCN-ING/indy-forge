@@ -5,7 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0] - 2024-11-12
+
+### Added
+
+- New transaction preparation workflows
+    - Option to prepare transactions without signing
+    - Option to sign without submitting to ledger
+    - Visual indicators for transaction preparation state
+    - Transaction status feedback based on preparation options
+- Enhanced documentation
+    - New Wallet Tool user guide
+    - Publishing Tool documentation
+    - Usage instructions and best practices
+    - Troubleshooting guides
+
+### Changed
+
+- Improved transaction handling system
+    - Renamed `write_signed_transaction_to_ledger` to `prepare_transaction` for clarity
+    - Added support for unsigned transaction preview
+    - Enhanced transaction preparation workflow
+- Unified transaction display system
+
 ## [0.7.0] - 2024-11-12
+
+[Previous changelog content...]
 
 ### Added
 
