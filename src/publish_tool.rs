@@ -396,7 +396,6 @@ mod tests {
     use crate::app::MyRoles;
     use indy_vdr::ledger::{constants, RequestBuilder};
     use indy_vdr::pool::ProtocolVersion;
-    use serde_json::json;
 
     #[test]
     fn test_author_role_mapping() -> anyhow::Result<()> {
