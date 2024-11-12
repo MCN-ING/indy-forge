@@ -67,7 +67,7 @@ pub struct TemplateApp {
     trustee_seed: String,
     endorser_seed: String,
     txn: String,
-    signed_txn_result: std::option::Option<String>,
+    signed_txn_result: Option<String>,
     tool_visibility: ToolVisibility,
     genesis_source: Option<GenesisSource>,
     nym_role: MyRoles,
@@ -285,7 +285,7 @@ impl eframe::App for TemplateApp {
                                             ui.colored_label(egui::Color32::RED, "Failed to read genesis file");
                                         }
                                     }
-                                    Some(GenesisSource::Url(url)) => {
+                                    Some(GenesisSource::Url(_url)) => {
                                         if self.genesis_content.is_none() {
                                             ui.spinner();
                                             ui.label("Loading genesis content...");
@@ -310,7 +310,7 @@ impl eframe::App for TemplateApp {
                         // Only proceed if we have both
                         if has_wallet && has_genesis {
                             // Check if we're already connected and not in an error state
-                            if self.ledgers.is_none() && !self.ledger_connecting && !self.ledger_error.is_some() {
+                            if self.ledgers.is_none() && !self.ledger_connecting && self.ledger_error.is_none() {
                                 // Set connecting flag to true
                                 self.ledger_connecting = true;
 
@@ -330,7 +330,7 @@ impl eframe::App for TemplateApp {
                                     }
                                 });
 
-                                if !self.ledger_error.is_some() {  // Only try connection if we haven't timed out
+                                if self.ledger_error.is_none() {  // Only try connection if we haven't timed out
                                     // Move connection attempt into a block_on block to ensure completion
                                     let connection_result = block_on(async {
                                         // Wrap the entire connection process in a timeout

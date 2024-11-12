@@ -1,16 +1,13 @@
 use crate::app::NymInfo;
 use crate::helpers::genesis::GenesisSource;
 use crate::helpers::wallet::IndyWallet;
-use anyhow::Context;
 use indy_data_types::anoncreds::schema::Schema;
 use indy_data_types::did::DidValue;
 use indy_vdr::common::error::{VdrError, VdrErrorKind, VdrResult};
 use indy_vdr::config::PoolConfig;
 use indy_vdr::ledger::constants::UpdateRole;
 use indy_vdr::pool::helpers::perform_ledger_request;
-use indy_vdr::pool::{
-    LocalPool, Pool, PoolBuilder, PoolTransactions, PreparedRequest, RequestResult,
-};
+use indy_vdr::pool::{LocalPool, Pool, PoolBuilder, PreparedRequest, RequestResult};
 
 #[derive(Clone)]
 pub struct IndyLedger {
@@ -153,18 +150,18 @@ impl IndyLedger {
         }
 
         // Get the operation type to validate the request
-        let operation = req_json
-            .get("operation")
-            .and_then(|op| op.as_object())
-            .and_then(|op| op.get("type"))
-            .and_then(|t| t.as_str())
-            .ok_or_else(|| {
-                VdrError::new(
-                    VdrErrorKind::Input,
-                    Some("Missing or invalid operation type in request".to_string()),
-                    None,
-                )
-            })?;
+        // let operation = req_json
+        //     .get("operation")
+        //     .and_then(|op| op.as_object())
+        //     .and_then(|op| op.get("type"))
+        //     .and_then(|t| t.as_str())
+        //     .ok_or_else(|| {
+        //         VdrError::new(
+        //             VdrErrorKind::Input,
+        //             Some("Missing or invalid operation type in request".to_string()),
+        //             None,
+        //         )
+        //     })?;
 
         // Sign the transaction using multi-signature format
         match req.get_signature_input() {

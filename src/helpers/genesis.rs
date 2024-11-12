@@ -2,7 +2,6 @@ use anyhow::{anyhow, Context, Result};
 use indy_vdr::pool::PoolTransactions;
 use reqwest;
 use reqwest::Client;
-use std::fs;
 use std::path::Path;
 use std::time::Duration;
 use tokio::time::timeout;

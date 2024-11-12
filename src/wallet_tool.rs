@@ -75,16 +75,14 @@ pub fn create_wallet_ui(
         let submit_clicked = ui.button("Load URL").clicked();
         let enter_pressed = response.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter));
 
-        if submit_clicked || enter_pressed {
-            if !genesis_url_input.is_empty() {
-                ui.spinner(); // Show a loading indicator
-                match GenesisSource::from_str(genesis_url_input) {
-                    Ok(source) => {
-                        *genesis_source = Some(source);
-                    }
-                    Err(e) => {
-                        ui.colored_label(egui::Color32::RED, format!("Invalid URL: {}", e));
-                    }
+        if (submit_clicked || enter_pressed) && !genesis_url_input.is_empty() {
+            ui.spinner(); // Show a loading indicator
+            match GenesisSource::from_str(genesis_url_input) {
+                Ok(source) => {
+                    *genesis_source = Some(source);
+                }
+                Err(e) => {
+                    ui.colored_label(egui::Color32::RED, format!("Invalid URL: {}", e));
                 }
             }
         }
