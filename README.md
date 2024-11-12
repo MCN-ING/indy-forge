@@ -54,6 +54,25 @@ Sadly, for the moment, the zmq library is preventing a webassembly build.
 - Comprehensive validation of DID-verkey relationships
 - Cross-validated cryptographic operations
 
+## Local Storage
+
+IndyForge uses local storage to save user preferences and recent genesis URLs. Storage locations:
+
+- Linux: `~/.local/share/indyforge/`
+- Windows: `%APPDATA%/indyforge/`
+- macOS: `~/Library/Application Support/indyforge/`
+
+These directories are automatically created when needed. They contain user-specific data and should not be committed to
+the repository.
+
+### Developers
+
+When developing IndyForge:
+
+1. Ensure storage directories are in your .gitignore
+2. Be cautious when committing - verify no user data is included
+3. Storage is disabled during tests to prevent test data persistence
+
 ## À propos
 
 Une interface graphique pour divers utilitaires qui peuvent être utiles pour Indy Ledger.
