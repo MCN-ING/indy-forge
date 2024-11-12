@@ -1,4 +1,4 @@
-use crate::app::{MyRoles, NymInfo, SchemaInfo};
+use crate::app::{MyRoles, NymInfo, SchemaInfo, TransactionOptions};
 use crate::helpers::genesis::GenesisSource;
 use crate::helpers::ledgers::IndyLedger;
 use crate::helpers::wallet::IndyWallet;
@@ -35,6 +35,7 @@ pub fn publish_tool_ui(
     schema_info: &mut SchemaInfo,
     txn: &mut String,
     signed_txn_result: &mut Option<String>,
+    transaction_options: &mut TransactionOptions,
 ) -> anyhow::Result<()> {
     ui.label("Publish something on a ledger");
 
@@ -45,6 +46,26 @@ pub fn publish_tool_ui(
         PublishEntities::Schema,
         PublishEntities::Custom,
     ];
+
+    ui.separator();
+    ui.heading("Transaction Options");
+    ui.horizontal(|ui| {
+        ui.checkbox(&mut transaction_options.sign, "Sign Transaction");
+        ui.checkbox(&mut transaction_options.send, "Send to Ledger");
+    });
+
+    if !transaction_options.send && !transaction_options.sign {
+        ui.colored_label(
+            egui::Color32::YELLOW,
+            "⚠️ Transaction will be prepared without signing",
+        );
+    } else if !transaction_options.send {
+        ui.colored_label(
+            egui::Color32::LIGHT_GREEN,
+            "ℹ️ Transaction will be signed but not sent",
+        );
+    }
+
     ComboBox::from_id_source("publish_option")
         .selected_text(publish_option.as_str())
         .show_ui(ui, |ui| {
@@ -150,9 +171,23 @@ pub fn publish_tool_ui(
                         wallet_ref,
                         &wallet_ref.did,
                         &schema_to_publish,
+                        transaction_options,
                     )) {
                         Ok(result) => {
+                            // Store only the raw transaction JSON
                             *txn_result = result;
+
+                            // Display additional context in the UI only
+                            ui.label(if transaction_options.send {
+                                "Schema transaction submitted successfully:"
+                            } else if transaction_options.sign {
+                                "Signed schema transaction (not submitted):"
+                            } else {
+                                "Unsigned schema transaction:"
+                            });
+
+                            // Display the formatted transaction
+                            ui.monospace(&*txn_result);
                         }
                         Err(e) => {
                             *txn_result = e.to_string();
@@ -203,6 +238,7 @@ pub fn publish_tool_ui(
             }
         });
         ui.separator();
+
         //endregion
     } else if *publish_option == PublishEntities::Nym.to_string() {
         ui.vertical(|ui| {
@@ -279,15 +315,8 @@ pub fn publish_tool_ui(
                     missing_fields_str
                 ),
             );
-        } else {
-            // If both DID and Verkey seems valid, show the "Register Nym" button
-            if ui.button("Register Nym").clicked()
-                && is_valid_did.is_ok()
-                && is_valid_verkey.is_ok()
-                && genesis_source.is_some()
-            {
-                ui.label("Registering NYM...");
-
+        } else if ui.button("Prepare NYM Transaction").clicked() {
+            if let Some(ledger) = ledgers {
                 let wallet_ref = wallet.as_ref().unwrap();
                 let role = match nym_role {
                     MyRoles::Author => UpdateRole::Reset,
@@ -296,31 +325,68 @@ pub fn publish_tool_ui(
                     MyRoles::Steward => UpdateRole::Set(LedgerRole::Steward),
                     MyRoles::Trustee => UpdateRole::Set(LedgerRole::Trustee),
                 };
-                if let Some(ledger) = ledgers {
-                    match block_on(IndyLedger::publish_nym(
-                        ledger,
-                        wallet_ref,
-                        &wallet_ref.did,
-                        nym_info,
-                        role,
-                    )) {
-                        Ok(result) => {
-                            *txn_result = result;
-                            // Clear the fields after the transaction is successful
+
+                match block_on(ledger.publish_nym(
+                    wallet_ref,
+                    &wallet_ref.did,
+                    nym_info,
+                    role,
+                    transaction_options,
+                )) {
+                    Ok(result) => {
+                        // Store only the raw transaction JSON in txn_result
+                        *txn_result = result;
+
+                        // Display additional context in the UI only
+                        ui.label(if transaction_options.send {
+                            "Transaction submitted successfully:"
+                        } else if transaction_options.sign {
+                            "Signed transaction (not submitted):"
+                        } else {
+                            "Unsigned transaction:"
+                        });
+
+                        // Display the formatted transaction
+                        ui.monospace(&*txn_result);
+
+                        if transaction_options.send {
                             nym_info.did.clear();
                             nym_info.verkey.clear();
                         }
-                        Err(e) => {
-                            *txn_result = e.to_string();
-                        }
+                    }
+                    Err(e) => {
+                        *txn_result = format!("Error: {}", e);
                     }
                 }
             }
         }
     }
+    // Add copy button for the transaction result
     ui.separator();
-    ui.label("Result:");
-    ui.monospace(format!("{:?}", txn_result));
+    // Clone once at the start before any usage
+    let txn_display = txn_result.clone();
+
+    if !txn_display.is_empty() {
+        if !txn_display.starts_with("Error:") {
+            // Show context in the UI
+            ui.label(if transaction_options.send {
+                "Submitted transaction:"
+            } else {
+                "Prepared transaction:"
+            });
+
+            // Display the transaction
+            ui.monospace(&txn_display);
+
+            // Use the same cloned value for copying
+            if ui.button("📋 Copy Transaction").clicked() {
+                ui.output_mut(|o| o.copied_text = txn_display.clone());
+            }
+        } else {
+            // If it's an error, display it as is
+            ui.colored_label(egui::Color32::RED, &txn_display);
+        }
+    }
     Ok(())
 }
 
@@ -330,18 +396,15 @@ mod tests {
     use crate::app::MyRoles;
     use indy_vdr::ledger::{constants, RequestBuilder};
     use indy_vdr::pool::ProtocolVersion;
-    use serde_json::json;
 
     #[test]
     fn test_author_role_mapping() -> anyhow::Result<()> {
-        // First test the enum mapping
         let role = match MyRoles::Author {
             MyRoles::Author => UpdateRole::Reset,
             _ => panic!("Wrong role mapping"),
         };
         assert_eq!(role, UpdateRole::Reset);
 
-        // Create request builder directly
         let request_builder = RequestBuilder::new(ProtocolVersion::default());
         let submitter_did = DidValue("V4SGRU86Z58d6TV7PBUe6f".to_string());
         let target_did = DidValue("7RR5ZhPkxRnNFsV6uhNDfq".to_string());
@@ -355,13 +418,6 @@ mod tests {
             None,
             None,
         )?;
-
-        // Check that the operation contains null role as shown in the indy-vdr test
-        let _expected_operation = json!({
-            "type": constants::NYM,
-            "dest": target_did.to_string(),
-            "role": serde_json::Value::Null,
-        });
 
         let request_json: serde_json::Value = serde_json::from_str(&request.req_json.to_string())?;
 
@@ -386,5 +442,71 @@ mod tests {
         );
 
         Ok(())
+    }
+
+    #[test]
+    fn test_transaction_options_default() {
+        let options = TransactionOptions::default();
+        assert!(options.sign, "Sign should be true by default");
+        assert!(options.send, "Send should be true by default");
+    }
+
+    #[test]
+    fn test_publish_entities_display() {
+        assert_eq!(PublishEntities::Nym.to_string(), "Nym");
+        assert_eq!(PublishEntities::Schema.to_string(), "Schema");
+        assert_eq!(PublishEntities::Custom.to_string(), "Custom");
+        assert_eq!(PublishEntities::CredDef.to_string(), "CredDef");
+        assert_eq!(PublishEntities::Attrib.to_string(), "Attrib");
+    }
+
+    #[test]
+    fn test_publish_entities_equality() {
+        assert_eq!(PublishEntities::Nym, PublishEntities::Nym);
+        assert_ne!(PublishEntities::Nym, PublishEntities::Schema);
+        assert_ne!(PublishEntities::Schema, PublishEntities::Custom);
+    }
+
+    #[test]
+    fn test_role_mappings() {
+        assert!(matches!(
+            match MyRoles::Author {
+                MyRoles::Author => UpdateRole::Reset,
+                _ => panic!("Wrong mapping"),
+            },
+            UpdateRole::Reset
+        ));
+
+        assert!(matches!(
+            match MyRoles::Endorser {
+                MyRoles::Endorser => UpdateRole::Set(LedgerRole::Endorser),
+                _ => panic!("Wrong mapping"),
+            },
+            UpdateRole::Set(LedgerRole::Endorser)
+        ));
+
+        assert!(matches!(
+            match MyRoles::NetworkMonitor {
+                MyRoles::NetworkMonitor => UpdateRole::Set(LedgerRole::NetworkMonitor),
+                _ => panic!("Wrong mapping"),
+            },
+            UpdateRole::Set(LedgerRole::NetworkMonitor)
+        ));
+
+        assert!(matches!(
+            match MyRoles::Steward {
+                MyRoles::Steward => UpdateRole::Set(LedgerRole::Steward),
+                _ => panic!("Wrong mapping"),
+            },
+            UpdateRole::Set(LedgerRole::Steward)
+        ));
+
+        assert!(matches!(
+            match MyRoles::Trustee {
+                MyRoles::Trustee => UpdateRole::Set(LedgerRole::Trustee),
+                _ => panic!("Wrong mapping"),
+            },
+            UpdateRole::Set(LedgerRole::Trustee)
+        ));
     }
 }

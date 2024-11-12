@@ -19,6 +19,21 @@ pub enum MyRoles {
     Trustee = 0,
 }
 
+#[derive(serde::Deserialize, serde::Serialize, Debug)]
+pub struct TransactionOptions {
+    pub sign: bool,
+    pub send: bool,
+}
+
+impl Default for TransactionOptions {
+    fn default() -> Self {
+        Self {
+            sign: true,
+            send: true,
+        }
+    }
+}
+
 pub struct SchemaInfo {
     pub schema_name: String,
     pub schema_version: String,
@@ -85,6 +100,7 @@ pub struct TemplateApp {
     show_genesis_content: bool,
     current_genesis_path: Option<String>,
     connection_start_time: Option<std::time::Instant>,
+    transaction_options: TransactionOptions,
 }
 
 impl Default for TemplateApp {
@@ -126,6 +142,7 @@ impl Default for TemplateApp {
             show_genesis_content: false,
             current_genesis_path: None,
             connection_start_time: None,
+            transaction_options: TransactionOptions::default(),
         }
     }
 }
@@ -442,6 +459,7 @@ impl eframe::App for TemplateApp {
                                     &mut self.schema_info,
                                     &mut self.txn,
                                     &mut self.signed_txn_result,
+                                    &mut self.transaction_options,
                                 ).expect("Failed to render publish tool UI");
                             }
                         }

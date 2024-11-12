@@ -5,7 +5,58 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.0] - 2024-11-12
+
+### Added
+
+- Transaction preparation functionality
+    - Option to prepare transactions without sending to ledger
+    - Toggle for transaction signing
+    - Toggle for transaction submission
+    - Visual indicators for transaction preparation mode
+- Enhanced transaction display
+    - Improved JSON formatting for transactions
+    - Clean transaction copying without descriptive text
+    - Separate display of transaction status and content
+    - Copy functionality for prepared transactions
+
+### Changed
+
+- Modified the transaction workflow
+    - Separated transaction preparation from submission
+    - Added explicit transaction signing step
+    - Improved transaction display formatting
+    - Enhanced error handling for transaction preparation
+- Updated UI elements
+    - Added transaction options checkboxes
+    - Improved transaction status indicators
+    - Enhanced feedback for transaction operations
+    - Better organization of transaction controls
+
+### Fixed
+
+- Transaction display issues
+    - Removed descriptive text from copied transactions
+    - Fixed JSON formatting in display and copy operations
+    - Corrected transaction status messages
+    - Resolved borrow checker issues with transaction handling
+- UI interaction improvements
+    - Fixed transaction copy functionality
+    - Improved error message display
+    - Enhanced transaction status visibility
+    - Better handling of transaction state
+
+### Security
+
+- Improved transaction handling
+    - Clear separation of unsigned and signed transactions
+    - Better visibility of transaction signing state
+    - Enhanced transaction preparation feedback
+    - Improved transaction state management
+
 ## [0.6.0] - 2024-11-11
+
+[Previous changelog content...]
 
 ### Added
 

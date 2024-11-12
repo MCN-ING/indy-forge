@@ -1,4 +1,4 @@
-use crate::app::NymInfo;
+use crate::app::{NymInfo, TransactionOptions};
 use crate::helpers::genesis::GenesisSource;
 use crate::helpers::wallet::IndyWallet;
 use indy_data_types::anoncreds::schema::Schema;
@@ -80,14 +80,45 @@ impl IndyLedger {
         wallet: &IndyWallet,
         submitter_did: &str,
         schema: &Schema,
+        options: &TransactionOptions,
     ) -> VdrResult<String> {
         let mut request = self
             .pool
             .get_request_builder()
-            .build_schema_request(&DidValue(submitter_did.to_string()), schema.clone())
-            .unwrap();
+            .build_schema_request(&DidValue(submitter_did.to_string()), schema.clone())?;
 
-        self._sign_and_submit_request(wallet, &mut request).await
+        let result = if options.sign {
+            let sig_bytes = request.get_signature_input()?;
+            let signature = wallet.sign(sig_bytes.as_bytes()).await;
+            request.set_signature(&signature)?;
+            serde_json::to_string_pretty(&request.req_json).map_err(|e| {
+                VdrError::new(
+                    VdrErrorKind::Input,
+                    Some(format!(
+                        "Failed to serialize signed schema transaction: {}",
+                        e
+                    )),
+                    None,
+                )
+            })?
+        } else {
+            serde_json::to_string_pretty(&request.req_json).map_err(|e| {
+                VdrError::new(
+                    VdrErrorKind::Input,
+                    Some(format!(
+                        "Failed to serialize unsigned schema transaction: {}",
+                        e
+                    )),
+                    None,
+                )
+            })?
+        };
+
+        if options.send {
+            self._submit_request(&request).await
+        } else {
+            Ok(result)
+        }
     }
 
     pub async fn publish_nym(
@@ -95,26 +126,46 @@ impl IndyLedger {
         wallet: &IndyWallet,
         submitter_did: &str,
         nym_info: &mut NymInfo,
-        // target_did: &str,
-        // verkey: &str,
         role: UpdateRole,
+        options: &TransactionOptions,
     ) -> VdrResult<String> {
         let alias = nym_info.alias.clone().filter(|a| !a.trim().is_empty());
-        let mut request = self
-            .pool
-            .get_request_builder()
-            .build_nym_request(
-                &DidValue(submitter_did.to_string()),
-                &DidValue(nym_info.did.to_string()),
-                Some(nym_info.verkey.to_string()),
-                alias,
-                Some(role),
-                None,
-                None,
-            )
-            .unwrap();
+        let mut request = self.pool.get_request_builder().build_nym_request(
+            &DidValue(submitter_did.to_string()),
+            &DidValue(nym_info.did.to_string()),
+            Some(nym_info.verkey.to_string()),
+            alias,
+            Some(role),
+            None,
+            None,
+        )?;
 
-        self._sign_and_submit_request(wallet, &mut request).await
+        let result = if options.sign {
+            let sig_bytes = request.get_signature_input()?;
+            let signature = wallet.sign(sig_bytes.as_bytes()).await;
+            request.set_signature(&signature)?;
+            serde_json::to_string_pretty(&request.req_json).map_err(|e| {
+                VdrError::new(
+                    VdrErrorKind::Input, // Using Input for serialization errors
+                    Some(format!("Failed to serialize signed transaction: {}", e)),
+                    None,
+                )
+            })?
+        } else {
+            serde_json::to_string_pretty(&request.req_json).map_err(|e| {
+                VdrError::new(
+                    VdrErrorKind::Input, // Using Input for serialization errors
+                    Some(format!("Failed to serialize unsigned transaction: {}", e)),
+                    None,
+                )
+            })?
+        };
+
+        if options.send {
+            self._submit_request(&request).await
+        } else {
+            Ok(result)
+        }
     }
 
     // function to only send a transaction that is already signed
