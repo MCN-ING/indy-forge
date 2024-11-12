@@ -3,9 +3,6 @@ on: [ pull_request, workflow_dispatch ]
 name: CI
 
 env:
-  # --cfg=web_sys_unstable_apis is required to enable the web_sys clipboard API which egui_web uses
-  # https://rustwasm.github.io/wasm-bindgen/api/web_sys/struct.Clipboard.html
-  # https://rustwasm.github.io/docs/wasm-bindgen/web-sys/unstable-apis.html
   RUSTFLAGS: -D warnings --cfg=web_sys_unstable_apis
   RUSTDOCFLAGS: -D warnings
 
@@ -25,22 +22,6 @@ jobs:
           command: check
           args: --all-features
 
-  #  #  check_wasm:
-  #  #    name: Check wasm32
-  #  #    runs-on: ubuntu-latest
-  #  #    steps:
-  #  #      - uses: actions/checkout@v4
-  #  #      - uses: actions-rs/toolchain@v1
-  #  #        with:
-  #  #          profile: minimal
-  #  #          toolchain: stable
-  #  #          target: wasm32-unknown-unknown
-  #  #          override: true
-  #  #      - uses: actions-rs/cargo@v1
-  #  #        with:
-  #  #          command: check
-  #  #          args: --all-features --lib --target wasm32-unknown-unknown
-  #
   test:
     name: Test Suite
     runs-on: ubuntu-latest
@@ -88,76 +69,71 @@ jobs:
         with:
           command: clippy
           args: -- -D warnings
-  #
-  #  #  trunk:
-  #  #    name: trunk
-  #  #    runs-on: ubuntu-latest
-  #  #    steps:
-  #  #      - uses: actions/checkout@v4
-  #  #      - uses: actions-rs/toolchain@v1
-  #  #        with:
-  #  #          profile: minimal
-  #  #          toolchain: 1.76.0
-  #  #          target: wasm32-unknown-unknown
-  #  #          override: true
-  #  #      - name: Download and install Trunk binary
-  #  #        run: wget -qO- https://github.com/thedodd/trunk/releases/latest/download/trunk-x86_64-unknown-linux-gnu.tar.gz | tar -xzf-
-  #  #      - name: Build
-  #  #        run: ./trunk build
-  #
+
   build:
+    needs: [ check, test, fmt, clippy ]
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         include:
           - os: macos-latest
-            TARGET: aarch64-apple-darwin
+            target: aarch64-apple-darwin
+            extension: ""
+
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            extension: ""
 
           - os: ubuntu-latest
-            TARGET: x86_64-unknown-linux-musl
+            target: x86_64-unknown-linux-gnu
+            extension: ""
 
     steps:
-      - name: Building ${{ matrix.TARGET }}
-        run: echo "${{ matrix.TARGET }}"
+      - name: Building ${{ matrix.target }}
+        run: echo "${{ matrix.target }}"
 
-      - uses: actions/checkout@master
-      - uses: actions-rs/toolchain@v1.0.1
+      - uses: actions/checkout@v4
+
+      - uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
-          target: ${{ matrix.TARGET }}
+          target: ${{ matrix.target }}
           override: true
 
-      - name: Install CMake
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
         run: |
-          if  [[ "${{ runner.os }}" == "macOS" ]]; then
-            brew install cmake
-          else
-            sudo apt-get install -y cmake
-          fi
-        shell: bash
+          sudo apt-get update
+          sudo apt-get install -y cmake libssl-dev pkg-config libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libxkbcommon-dev
+
+      - name: Install macOS dependencies
+        if: runner.os == 'macOS'
+        run: brew install cmake
 
       - uses: actions-rs/cargo@v1
         with:
-          use-cross: true
           command: build
-          args: --verbose --release --target=${{ matrix.TARGET }}
+          args: --verbose --release --target=${{ matrix.target }}
 
-#      - name: Rename
-#        run: cp target/${{ matrix.TARGET }}/release/eframe_template${{ matrix.EXTENSION }} eframe_template-${{ matrix.TARGET }}${{ matrix.EXTENSION }}
-#
-#      - uses: actions/upload-artifact@master
-#        with:
-#          name: eframe_template-${{ matrix.TARGET }}${{ matrix.EXTENSION }}
-#          path: eframe_template-${{ matrix.TARGET }}${{ matrix.EXTENSION }}
-#
-#      - uses: svenstaro/upload-release-action@v2
-#        name: Upload binaries to release
-#        if: ${{ github.event_name == 'push' }}
-#        with:
-#          repo_token: ${{ secrets.GITHUB_TOKEN }}
-#          file: eframe_template-${{ matrix.TARGET }}${{ matrix.EXTENSION }}
-#          asset_name: eframe_template-${{ matrix.TARGET }}${{ matrix.EXTENSION }}
-#          tag: ${{ github.ref }}
-#          prerelease: ${{ !startsWith(github.ref, 'refs/tags/') }}
-#          overwrite: true
+      - name: Prepare artifacts
+        run: |
+          mkdir artifacts
+          cp target/${{ matrix.target }}/release/indyforge${{ matrix.extension }} artifacts/indyforge-${{ matrix.target }}${{ matrix.extension }}
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: indyforge-${{ matrix.target }}
+          path: artifacts/indyforge-${{ matrix.target }}${{ matrix.extension }}
+          if-no-files-found: error
+
+      - name: Upload Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: artifacts/indyforge-${{ matrix.target }}${{ matrix.extension }}
+          asset_name: indyforge-${{ matrix.target }}${{ matrix.extension }}
+          tag: ${{ github.ref }}
+          overwrite: true

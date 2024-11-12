@@ -1,6 +1,6 @@
 use indy_data_types::did::{generate_did, DidValue};
 use indy_data_types::keys::PrivateKey;
-use indy_vdr::common::error::VdrResult;
+use indy_vdr::common::error::{VdrError, VdrErrorKind, VdrResult};
 use indy_vdr::pool::PreparedRequest;
 use serde_json::Value;
 
@@ -18,7 +18,13 @@ pub fn create_did(seed: String, version: usize) -> anyhow::Result<DidInfo> {
 pub fn sign_transaction(data: DidInfo, txn: String) -> VdrResult<Value> {
     let mut req = PreparedRequest::from_request_json(txn)?;
     let sigin = req.get_signature_input()?;
-    let sig = data.privatekey.sign(sigin.as_bytes()).unwrap();
+    let sig = data.privatekey.sign(sigin.as_bytes()).map_err(|e| {
+        VdrError::new(
+            VdrErrorKind::Input, // Using Input as it's related to input processing
+            Some(format!("Signing failed: {}", e)),
+            None,
+        )
+    })?;
     req.set_multi_signature(&data.did, &sig)?;
     Ok(req.req_json)
 }

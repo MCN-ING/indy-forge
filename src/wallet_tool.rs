@@ -1,4 +1,5 @@
 use crate::app::DIDVersion;
+use crate::helpers::genesis::GenesisSource;
 use crate::helpers::wallet::IndyWallet;
 use egui::{Button, TextEdit, Ui};
 use futures_executor::block_on;
@@ -8,8 +9,9 @@ pub fn create_wallet_ui(
     ui: &mut Ui,
     seed: &mut String,
     wallet: &mut Option<IndyWallet>,
-    picked_path: &mut Option<String>,
+    genesis_source: &mut Option<GenesisSource>,
     did_version: &mut DIDVersion,
+    genesis_url_input: &mut String,
 ) -> anyhow::Result<()> {
     ui.colored_label(
         egui::Color32::from_rgb(144, 238, 144),
@@ -38,9 +40,17 @@ pub fn create_wallet_ui(
             DIDVersion::Sov => 1,
             DIDVersion::Indy => 2,
         };
-        let new_wallet = block_on(IndyWallet::new(Some(&seed), did_version_value));
-
-        *wallet = Some(new_wallet.unwrap());
+        match block_on(IndyWallet::new(Some(&seed), did_version_value)) {
+            Ok(new_wallet) => {
+                *wallet = Some(new_wallet);
+            }
+            Err(e) => {
+                ui.colored_label(
+                    egui::Color32::RED,
+                    format!("Failed to create wallet: {}", e),
+                );
+            }
+        }
     }
 
     if let Some(wallet) = wallet {
@@ -54,16 +64,55 @@ pub fn create_wallet_ui(
         egui::Color32::from_rgb(135, 206, 250),
         "The genesis file is required to publish something on a ledger",
     );
-    if ui.button("Select Genesis File").clicked() {
-        if let Some(path) = FileDialog::new().pick_file() {
-            *picked_path = Some(path.display().to_string());
+    ui.horizontal(|ui| {
+        if ui.button("Select Local Genesis File").clicked() {
+            if let Some(path) = FileDialog::new().pick_file() {
+                *genesis_source = GenesisSource::from_str(&path.display().to_string()).ok();
+            }
         }
-    }
-    if let Some(picked_path) = picked_path {
+
+        ui.separator();
+
+        ui.label("Or enter genesis URL:");
+        let response = ui.add(
+            egui::TextEdit::singleline(genesis_url_input)
+                .hint_text("https://example.com/genesis.txt")
+                .desired_width(300.0),
+        );
+
+        let submit_clicked = ui.button("Load URL").clicked();
+        let enter_pressed = response.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter));
+
+        if (submit_clicked || enter_pressed) && !genesis_url_input.is_empty() {
+            ui.spinner(); // Show a loading indicator
+            match GenesisSource::from_str(genesis_url_input) {
+                Ok(source) => {
+                    *genesis_source = Some(source);
+                }
+                Err(e) => {
+                    ui.colored_label(egui::Color32::RED, format!("Invalid URL: {}", e));
+                }
+            }
+        }
+    });
+
+    // Add helper text
+    ui.small("Press Enter or click 'Load URL' to load genesis file from URL");
+
+    if let Some(source) = genesis_source {
+        ui.separator();
         ui.horizontal(|ui| {
-            ui.label("Picked file:");
-            ui.monospace(picked_path.clone());
+            ui.label("Active genesis source:");
+            match source {
+                GenesisSource::LocalFile(path) => {
+                    ui.colored_label(egui::Color32::GREEN, format!("📁 Local file: {}", path));
+                }
+                GenesisSource::Url(url) => {
+                    ui.colored_label(egui::Color32::GREEN, format!("🌐 URL: {}", url));
+                }
+            }
         });
     }
+
     Ok(())
 }
