@@ -1,6 +1,7 @@
 use crate::helpers::genesis::GenesisSource;
 use crate::helpers::ledgers::IndyLedger;
 use crate::helpers::wallet::IndyWallet;
+use crate::helpers::workflow_guide::WorkflowGuide;
 use crate::indorser::endorser_tool;
 use crate::publish_tool::publish_tool_ui;
 use crate::wallet_tool::{create_wallet_ui, RecentUrls};
@@ -46,6 +47,7 @@ pub struct ToolVisibility {
     show_endorser: bool,
     show_publish_tool: bool,
     show_wallet_tool: bool,
+    show_workflow_guide: bool,
 }
 
 #[derive(Debug)]
@@ -116,6 +118,7 @@ impl Default for TemplateApp {
                 show_endorser: true,
                 show_publish_tool: true,
                 show_wallet_tool: true,
+                show_workflow_guide: true,
             },
             genesis_source: Default::default(),
             nym_role: Default::default(),
@@ -206,6 +209,7 @@ impl eframe::App for TemplateApp {
                 ui.checkbox(&mut self.tool_visibility.show_endorser, "Endorser Tool");
                 ui.checkbox(&mut self.tool_visibility.show_publish_tool, "Publish Tool");
                 ui.checkbox(&mut self.tool_visibility.show_wallet_tool, "Wallet Tool");
+                ui.checkbox(&mut self.tool_visibility.show_workflow_guide, "Guide");
                 ui.separator();
                 if ui.button("Organize windows").clicked() {
                     ui.ctx().memory_mut(|mem| mem.reset_areas());
@@ -213,7 +217,14 @@ impl eframe::App for TemplateApp {
             });
         egui::CentralPanel::default().show(ctx, |ui| {
             // The central panel the region left after adding TopPanel's and SidePanel's
-
+            // Show the guide as a window if enabled
+            if self.tool_visibility.show_workflow_guide {
+                let workflow_guide = WorkflowGuide::new(
+                    self.wallet.is_some(),
+                    self.genesis_source.is_some()
+                );
+                workflow_guide.show(ctx);
+            }
             // Indorser Tool section
             if self.tool_visibility.show_endorser {
                 // Only show the "Indorser" window if `show_indorser` is true
