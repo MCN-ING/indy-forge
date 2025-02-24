@@ -1,0 +1,4037 @@
+This file is a merged representation of the entire codebase, combined into a single document by Repomix.
+
+================================================================
+File Summary
+================================================================
+
+Purpose:
+--------
+This file contains a packed representation of the entire repository's contents.
+It is designed to be easily consumable by AI systems for analysis, code review,
+or other automated processes.
+
+File Format:
+------------
+The content is organized as follows:
+1. This summary section
+2. Repository information
+3. Directory structure
+4. Multiple file entries, each consisting of:
+  a. A separator line (================)
+  b. The file path (File: path/to/file)
+  c. Another separator line
+  d. The full contents of the file
+  e. A blank line
+
+Usage Guidelines:
+-----------------
+- This file should be treated as read-only. Any changes should be made to the
+  original repository files, not this packed version.
+- When processing this file, use the file path to distinguish
+  between different files in the repository.
+- Be aware that this file may contain sensitive information. Handle it with
+  the same level of security as you would the original repository.
+
+Notes:
+------
+- Some files may have been excluded based on .gitignore rules and Repomix's configuration
+- Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
+- Files matching patterns in .gitignore are excluded
+- Files matching default ignore patterns are excluded
+
+Additional Info:
+----------------
+
+================================================================
+Directory Structure
+================================================================
+.cargo/
+  config.toml
+.github/
+  workflows/
+    rust.yml
+assets/
+  manifest.json
+  sw.js
+src/
+  docs/
+    publish-tool.md
+    wallet-tool.md
+  helpers/
+    genesis.rs
+    ledgers.rs
+    mod.rs
+    wallet.rs
+    workflow_guide.rs
+  app.rs
+  endorsing.rs
+  helper.rs
+  indorser.rs
+  lib.rs
+  main.rs
+  publish_tool.rs
+  wallet_tool.rs
+.gitignore
+.typos.toml
+Cargo.toml
+CHANGELOG.md
+check.sh
+index.html
+LICENSE-APACHE
+LICENSE-MIT
+README.md
+rust-toolchain
+Trunk.toml
+
+================================================================
+Files
+================================================================
+
+================
+File: .cargo/config.toml
+================
+# clipboard api is still unstable, so web-sys requires the below flag to be passed for copy (ctrl + c) to work
+# https://rustwasm.github.io/docs/wasm-bindgen/web-sys/unstable-apis.html
+# check status at https://developer.mozilla.org/en-US/docs/Web/API/Clipboard#browser_compatibility
+# we don't use `[build]` because of rust analyzer's build cache invalidation https://github.com/emilk/eframe_template/issues/93
+[target.wasm32-unknown-unknown]
+rustflags = ["--cfg=web_sys_unstable_apis"]
+
+================
+File: .github/workflows/rust.yml
+================
+name: CI
+
+on:
+  pull_request:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'  # This will trigger on any tag starting with 'v'
+
+env:
+  RUSTFLAGS: -D warnings --cfg=web_sys_unstable_apis
+  RUSTDOCFLAGS: -D warnings
+
+jobs:
+  check:
+    name: Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+      - uses: actions-rs/cargo@v1
+        with:
+          command: check
+          args: --all-features
+
+  test:
+    name: Test Suite
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+      - run: sudo apt-get install libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libxkbcommon-dev libssl-dev
+      - uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --lib
+
+  fmt:
+    name: Rustfmt
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+          components: rustfmt
+      - uses: actions-rs/cargo@v1
+        with:
+          command: fmt
+          args: --all -- --check
+
+  clippy:
+    name: Clippy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+          components: clippy
+      - uses: actions-rs/cargo@v1
+        with:
+          command: clippy
+          args: -- -D warnings
+
+  build:
+    name: Build
+    needs: [ check, test, fmt, clippy ]
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            extension: ""
+
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            extension: ""
+
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            extension: ""
+
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            extension: .exe
+
+    steps:
+      - name: Building ${{ matrix.target }}
+        run: echo "${{ matrix.target }}"
+
+      - uses: actions/checkout@v4
+
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          target: ${{ matrix.target }}
+          override: true
+
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake libssl-dev pkg-config libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libxkbcommon-dev
+
+      - name: Install macOS dependencies
+        if: runner.os == 'macOS'
+        run: brew install cmake
+
+      - name: Install Windows dependencies
+        if: runner.os == 'Windows'
+        run: |
+          vcpkg install openssl:x64-windows-static
+          echo "OPENSSL_DIR=C:/vcpkg/installed/x64-windows-static" >> $GITHUB_ENV
+          echo "OPENSSL_STATIC=1" >> $GITHUB_ENV
+
+      - uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --verbose --release --target=${{ matrix.target }}
+
+      - name: Prepare artifacts
+        shell: bash
+        run: |
+          mkdir -p artifacts
+          cp target/${{ matrix.target }}/release/indyforge${{ matrix.extension }} artifacts/indyforge-${{ matrix.target }}${{ matrix.extension }}
+          cd artifacts
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            certutil -hashfile indyforge-${{ matrix.target }}${{ matrix.extension }} SHA256 > indyforge-${{ matrix.target }}.sha256
+          elif [[ "$RUNNER_OS" == "macOS" ]]; then
+            shasum -a 256 indyforge-${{ matrix.target }}${{ matrix.extension }} > indyforge-${{ matrix.target }}.sha256
+          else
+            sha256sum indyforge-${{ matrix.target }}${{ matrix.extension }} > indyforge-${{ matrix.target }}.sha256
+          fi
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: indyforge-${{ matrix.target }}
+          path: |
+            artifacts/indyforge-${{ matrix.target }}${{ matrix.extension }}
+            artifacts/indyforge-${{ matrix.target }}.sha256
+          if-no-files-found: error
+
+  create-release:
+    name: Create Release
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v3
+        with:
+          path: artifacts
+
+      - name: Prepare release assets
+        run: |
+          mkdir release-assets
+          find artifacts -type f -exec cp {} release-assets/ \;
+          cd release-assets
+          sha256sum * > SHA256SUMS
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            release-assets/*
+          generate_release_notes: true
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  notify:
+    name: Notify
+    needs: create-release
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+      - name: Send notification
+        run: |
+          echo "Release ${{ github.ref_name }} has been published successfully!"
+          echo "Visit https://github.com/${{ github.repository }}/releases/tag/${{ github.ref_name }}"
+
+================
+File: assets/manifest.json
+================
+{
+  "name": "egui Template PWA",
+  "short_name": "egui-template-pwa",
+  "icons": [
+    {
+      "src": "./icon-256.png",
+      "sizes": "256x256",
+      "type": "image/png"
+    },
+    {
+      "src": "./maskable_icon_x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "./icon-1024.png",
+      "sizes": "1024x1024",
+      "type": "image/png"
+    }
+  ],
+  "lang": "en-US",
+  "id": "/index.html",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "white",
+  "theme_color": "white"
+}
+
+================
+File: assets/sw.js
+================
+var cacheName = 'egui-template-pwa';
+var filesToCache = [
+  './',
+  './index.html',
+  './indorser.js',
+  './indorser_bg.wasm',
+];
+
+/* Start the service worker and cache all of the app's content */
+self.addEventListener('install', function (e) {
+  e.waitUntil(
+    caches.open(cacheName).then(function (cache) {
+      return cache.addAll(filesToCache);
+    })
+  );
+});
+
+/* Serve cached content when offline */
+self.addEventListener('fetch', function (e) {
+  e.respondWith(
+    caches.match(e.request).then(function (response) {
+      return response || fetch(e.request);
+    })
+  );
+});
+
+================
+File: src/docs/publish-tool.md
+================
+# Publishing Tool Guide / Guide de l'outil de Publication
+
+## About / À propos
+
+The Publishing Tool in IndyForge allows you to create and submit various transactions to an Indy ledger, with options to
+prepare, sign, and verify transactions before submission.
+
+L'outil de Publication dans IndyForge vous permet de créer et de soumettre diverses transactions au registre Indy, avec
+des options pour préparer, signer et vérifier les transactions avant la soumission.
+
+## Features / Fonctionnalités
+
+- NYM transaction creation and registration / Création et enregistrement de transactions NYM
+- Schema creation and publishing / Création et publication de schémas
+- Custom transaction handling / Gestion des transactions personnalisées
+- Transaction preparation and review / Préparation et révision des transactions
+- Optional transaction signing and submission / Signature et soumission optionnelles des transactions
+
+## Transaction Types / Types de Transactions
+
+### NYM Transactions / Transactions NYM
+
+1. Enter NYM Details / Saisissez les détails du NYM:
+    - DID: The DID to be registered / Le DID à enregistrer
+    - Verkey: The verification key / La clé de vérification
+    - Alias (optional): A human-readable name / Un nom lisible (optionnel)
+    - Role: Select from Author, Endorser, Network Monitor, Steward, or Trustee / Sélectionnez parmi Author, Endorser,
+      Network Monitor, Steward, ou Trustee
+
+2. Transaction Options / Options de Transaction:
+    - Sign Transaction: Generate cryptographic signature / Générer une signature cryptographique
+    - Send to Ledger: Submit to the network / Soumettre au réseau
+
+3. Review and Submit / Révision et Soumission:
+    - Verify transaction details / Vérifier les détails de la transaction
+    - Copy transaction for external use / Copier la transaction pour usage externe
+    - Submit when ready / Soumettre quand prêt
+
+### Schema Transactions / Transactions de Schéma
+
+1. Define Schema / Définir le Schéma:
+    - Name: Schema identifier / Identifiant du schéma
+    - Version: Format x.x.x / Format x.x.x
+    - Attributes: Add/remove as needed / Ajouter/supprimer selon les besoins
+
+2. Preparation / Préparation:
+    - Review schema structure / Réviser la structure du schéma
+    - Verify attribute list / Vérifier la liste des attributs
+    - Choose signing and submission options / Choisir les options de signature et de soumission
+
+### Custom Transactions / Transactions Personnalisées
+
+1. Input Transaction / Saisie de la Transaction:
+    - Paste prepared transaction JSON / Coller le JSON de la transaction préparée
+    - Verify format and content / Vérifier le format et le contenu
+
+2. Options / Options:
+    - Sign: Add cryptographic signature / Ajouter une signature cryptographique
+    - Submit: Send to ledger / Envoyer au registre
+    - Preview: Review without sending / Réviser sans envoyer
+
+## Transaction Options / Options de Transaction
+
+For all transaction types / Pour tous les types de transactions:
+
+- **Sign Transaction / Signer la Transaction**:
+    - When enabled: Transaction will be cryptographically signed / Activé : La transaction sera signée
+      cryptographiquement
+    - When disabled: Transaction prepared without signature / Désactivé : Transaction préparée sans signature
+
+- **Send to Ledger / Envoyer au Registre**:
+    - When enabled: Transaction is submitted to the network / Activé : La transaction est soumise au réseau
+    - When disabled: Transaction is prepared but not sent / Désactivé : La transaction est préparée mais pas envoyée
+
+## Best Practices / Bonnes Pratiques
+
+1. Transaction Review / Révision des Transactions:
+    - Always review transactions before signing / Toujours réviser les transactions avant de signer
+    - Verify all fields are correct / Vérifier que tous les champs sont corrects
+    - Check role permissions / Vérifier les permissions des rôles
+
+2. Testing / Tests:
+    - Use preparation mode for verification / Utiliser le mode préparation pour la vérification
+    - Test on development networks first / Tester d'abord sur les réseaux de développement
+    - Keep track of transaction responses / Garder une trace des réponses des transactions
+
+3. Security / Sécurité:
+    - Verify signing authority / Vérifier l'autorité de signature
+    - Double-check role assignments / Revérifier les attributions de rôles
+    - Maintain proper key management / Maintenir une bonne gestion des clés
+
+## Troubleshooting / Dépannage
+
+Common issues / Problèmes courants:
+
+- Invalid DID format: Check DID syntax / Format DID invalide : Vérifier la syntaxe du DID
+- Role permission errors: Verify authority / Erreurs de permission de rôle : Vérifier l'autorité
+- Network issues: Check connection status / Problèmes réseau : Vérifier l'état de la connexion
+- Transaction rejections: Review format and permissions / Rejets de transactions : Réviser le format et les permissions
+
+================
+File: src/docs/wallet-tool.md
+================
+# Wallet Tool Guide / Guide de l'outil Wallet
+
+## About / À propos
+
+The Wallet Tool in IndyForge provides functionality for creating and managing DIDs (Decentralized Identifiers) for use
+with Indy networks.
+
+L'outil Wallet dans IndyForge fournit des fonctionnalités pour créer et gérer les DID (Identifiants Décentralisés) pour
+une utilisation avec les réseaux Indy.
+
+## Features / Fonctionnalités
+
+- Create temporary wallets with DIDs / Créer des wallets temporaires avec des DID
+- Support for both DID:SOV and DID:INDY formats / Prise en charge des formats DID:SOV et DID:INDY
+- Secure seed-based DID generation / Génération sécurisée de DID basée sur une seed
+- Genesis file management for network connectivity / Gestion des fichiers genesis pour la connectivité réseau
+
+## Usage / Utilisation
+
+### Creating a Wallet / Création d'un Wallet
+
+1. Enter a 32-byte seed in the seed input field / Entrez une seed de 32 octets dans le champ de saisie
+    - This seed will be used to generate your DID / Cette seed sera utilisée pour générer votre DID
+    - The same seed will always generate the same DID / La même seed générera toujours le même DID
+    - Keep this seed secure as it controls the DID / Gardez cette seed en sécurité car elle contrôle le DID
+
+2. Select DID Version / Sélectionnez la version du DID
+    - SOV: Traditional Sovrin DID format / Format DID Sovrin traditionnel
+    - Indy: Newer Indy DID format / Nouveau format DID Indy
+    - Choose based on your network requirements / Choisissez selon les exigences de votre réseau
+
+3. Click "Create Wallet" / Cliquez sur "Create Wallet"
+    - The tool will generate and display your DID and Verkey / L'outil générera et affichera votre DID et Verkey
+    - This information will be used for ledger operations / Ces informations seront utilisées pour les opérations sur le
+      registre
+
+### Connecting to a Network / Connexion à un Réseau
+
+1. Select Genesis File Source / Sélectionnez la source du fichier Genesis:
+    - Local File: Use "Select Local Genesis File" to choose a file from your system / Fichier local : Utilisez "Select
+      Local Genesis File" pour choisir un fichier depuis votre système
+    - URL: Enter a genesis file URL and click "Load URL" / URL : Entrez l'URL d'un fichier genesis et cliquez sur "Load
+      URL"
+
+2. Verify Connection / Vérifiez la Connexion
+    - The active genesis source will be displayed / La source genesis active sera affichée
+    - A successful connection is required for ledger operations / Une connexion réussie est nécessaire pour les
+      opérations sur le registre
+
+## Best Practices / Bonnes Pratiques
+
+1. Seed Management / Gestion des Seeds
+    - Use unique seeds for different DIDs / Utilisez des seeds uniques pour différents DID
+    - Store seeds securely / Stockez les seeds de manière sécurisée
+    - Never share your seeds / Ne partagez jamais vos seeds
+
+2. Network Selection / Sélection du Réseau
+    - Ensure your genesis file matches your target network / Assurez-vous que votre fichier genesis correspond à votre
+      réseau cible
+    - Verify network compatibility before operations / Vérifiez la compatibilité du réseau avant les opérations
+    - Keep genesis files up to date / Gardez les fichiers genesis à jour
+
+## Troubleshooting / Dépannage
+
+Common issues and solutions / Problèmes courants et solutions:
+
+- Invalid seed length: Ensure exactly 32 bytes / Longueur de seed invalide : Assurez-vous d'avoir exactement 32 octets
+- Genesis file errors: Verify file format and network availability / Erreurs de fichier genesis : Vérifiez le format du
+  fichier et la disponibilité du réseau
+- Connection issues: Check network connectivity and genesis file validity / Problèmes de connexion : Vérifiez la
+  connectivité réseau et la validité du fichier genesis
+
+================
+File: src/helpers/genesis.rs
+================
+use anyhow::{anyhow, Context, Result};
+use indy_vdr::pool::PoolTransactions;
+use reqwest;
+use reqwest::Client;
+use std::path::Path;
+use std::time::Duration;
+use tokio::time::timeout;
+
+#[derive(Clone)]
+pub enum GenesisSource {
+    LocalFile(String),
+    Url(String),
+}
+
+impl GenesisSource {
+    pub fn from_str(source: &str) -> Result<Self> {
+        if source.starts_with("http://") || source.starts_with("https://") {
+            Ok(GenesisSource::Url(source.to_string()))
+        } else if Path::new(source).exists() {
+            Ok(GenesisSource::LocalFile(source.to_string()))
+        } else {
+            Err(anyhow!("Source must be a valid URL or existing file path"))
+        }
+    }
+
+    pub async fn load_transactions(&self) -> anyhow::Result<PoolTransactions> {
+        match self {
+            GenesisSource::LocalFile(path) => {
+                log::debug!("Loading genesis file from path: {}", path);
+                PoolTransactions::from_json_file(path)
+                    .with_context(|| format!("Failed to load genesis file from path: {}", path))
+            }
+            GenesisSource::Url(url) => {
+                log::debug!("Fetching genesis file from URL: {}", url);
+
+                let client = Client::builder()
+                    .timeout(Duration::from_secs(10))
+                    .build()
+                    .context("Failed to create HTTP client")?;
+
+                // Wrap the request in a timeout
+                let response = timeout(
+                    Duration::from_secs(15), // Overall operation timeout
+                    client.get(url).send(),
+                )
+                .await
+                .with_context(|| "Connection timed out")??;
+
+                log::debug!("Got response with status: {}", response.status());
+
+                if !response.status().is_success() {
+                    return Err(anyhow::anyhow!(
+                        "Failed to fetch genesis file: HTTP {} - {}",
+                        response.status(),
+                        if response.status().as_u16() == 404 {
+                            "File not found"
+                        } else {
+                            "Server error"
+                        }
+                    ));
+                }
+
+                // Wrap content reading in a timeout as well
+                let content = timeout(
+                    Duration::from_secs(5), // Content reading timeout
+                    response.text(),
+                )
+                .await
+                .with_context(|| "Timeout while reading response content")??;
+
+                if content.trim().is_empty() {
+                    return Err(anyhow::anyhow!("Genesis file is empty"));
+                }
+
+                log::debug!("Received content length: {}", content.len());
+
+                PoolTransactions::from_json(&content).with_context(|| {
+                    "Failed to parse genesis transactions - invalid format".to_string()
+                })
+            }
+        }
+    }
+    // Add a separate method to get the content for viewing
+    pub async fn get_content(&self) -> anyhow::Result<String> {
+        match self {
+            GenesisSource::LocalFile(path) => std::fs::read_to_string(path)
+                .with_context(|| format!("Failed to read genesis file from path: {}", path)),
+            GenesisSource::Url(url) => {
+                let client = Client::builder()
+                    .timeout(Duration::from_secs(10))
+                    .build()
+                    .context("Failed to create HTTP client")?;
+
+                let response =
+                    client.get(url).send().await.with_context(|| {
+                        format!("Failed to fetch genesis file from URL: {}", url)
+                    })?;
+
+                response
+                    .text()
+                    .await
+                    .with_context(|| "Failed to read response content")
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_genesis_source_from_str() {
+        // Test URL
+        let url = "https://example.com/genesis.txt";
+        match GenesisSource::from_str(url) {
+            Ok(GenesisSource::Url(s)) => assert_eq!(s, url),
+            _ => panic!("Failed to parse URL"),
+        }
+
+        // Test invalid source
+        let invalid = "not/a/real/path";
+        assert!(GenesisSource::from_str(invalid).is_err());
+    }
+}
+
+================
+File: src/helpers/ledgers.rs
+================
+use crate::app::{NymInfo, TransactionOptions};
+use crate::helpers::genesis::GenesisSource;
+use crate::helpers::wallet::IndyWallet;
+use indy_data_types::anoncreds::schema::Schema;
+use indy_data_types::did::DidValue;
+use indy_vdr::common::error::{VdrError, VdrErrorKind, VdrResult};
+use indy_vdr::config::PoolConfig;
+use indy_vdr::ledger::constants::UpdateRole;
+use indy_vdr::ledger::requests::node::{NodeOperation, NodeOperationData, Services};
+use indy_vdr::pool::helpers::perform_ledger_request;
+use indy_vdr::pool::{LocalPool, Pool, PoolBuilder, PreparedRequest, RequestResult};
+
+#[derive(Clone)]
+pub struct IndyLedger {
+    pub pool: LocalPool,
+}
+
+impl IndyLedger {
+    pub async fn new(genesis_source: GenesisSource) -> VdrResult<Self> {
+        let pool_transactions = genesis_source.load_transactions().await.map_err(|e| {
+            VdrError::new(
+                VdrErrorKind::Input,
+                Some(format!("Failed to load genesis transactions: {}", e)),
+                None,
+            )
+        })?;
+
+        let pool = PoolBuilder::new(PoolConfig::default(), pool_transactions)
+            .into_local()
+            .map_err(|e| {
+                VdrError::new(
+                    VdrErrorKind::Config,
+                    Some("Failed to create pool from transactions".to_string()),
+                    Some(Box::new(e)),
+                )
+            })?;
+
+        Ok(IndyLedger { pool })
+    }
+
+    pub async fn check_connection(&self) -> VdrResult<bool> {
+        // Get config transaction which should always be available (#1)
+        let request = self
+            .pool
+            .get_request_builder()
+            .build_get_txn_request(None, 1, 1)?; // ledger_type = 1 (DOMAIN), seq_no = 1
+
+        match perform_ledger_request(&self.pool, &request, None).await {
+            Ok((RequestResult::Reply(_), _)) => Ok(true),
+            Ok((RequestResult::Failed(err), _)) => {
+                log::debug!("Connection check failed: {}", err);
+                Ok(false)
+            }
+            Err(e) => {
+                log::error!("Connection check error: {}", e);
+                Err(e)
+            }
+        }
+    }
+
+    // pub async fn publish_cred_def(
+    //     &self,
+    //     wallet: &IndyWallet,
+    //     submitter_did: &str,
+    //     cred_def: &CredentialDefinition,
+    // ) -> VdrResult<String> {
+    //     // hack to clone cred def
+    //     let cred_def_json = json!(cred_def).to_string();
+    //     let cred_def = serde_json::from_str(&cred_def_json).unwrap();
+    //
+    //     let mut request = self
+    //         .pool
+    //         .get_request_builder()
+    //         .build_cred_def_request(&DidValue(submitter_did.to_string()), cred_def)
+    //         .unwrap();
+    //
+    //     self._sign_and_submit_request(wallet, &mut request).await
+    // }
+    pub async fn publish_schema(
+        &self,
+        wallet: &IndyWallet,
+        submitter_did: &str,
+        schema: &Schema,
+        options: &TransactionOptions,
+    ) -> VdrResult<String> {
+        let mut request = self
+            .pool
+            .get_request_builder()
+            .build_schema_request(&DidValue(submitter_did.to_string()), schema.clone())?;
+
+        let result = if options.sign {
+            let sig_bytes = request.get_signature_input()?;
+            let signature = wallet.sign(sig_bytes.as_bytes()).await;
+            request.set_signature(&signature)?;
+            serde_json::to_string_pretty(&request.req_json).map_err(|e| {
+                VdrError::new(
+                    VdrErrorKind::Input,
+                    Some(format!(
+                        "Failed to serialize signed schema transaction: {}",
+                        e
+                    )),
+                    None,
+                )
+            })?
+        } else {
+            serde_json::to_string_pretty(&request.req_json).map_err(|e| {
+                VdrError::new(
+                    VdrErrorKind::Input,
+                    Some(format!(
+                        "Failed to serialize unsigned schema transaction: {}",
+                        e
+                    )),
+                    None,
+                )
+            })?
+        };
+
+        if options.send {
+            self._submit_request(&request).await
+        } else {
+            Ok(result)
+        }
+    }
+
+    pub async fn publish_nym(
+        &self,
+        wallet: &IndyWallet,
+        submitter_did: &str,
+        nym_info: &mut NymInfo,
+        role: UpdateRole,
+        options: &TransactionOptions,
+    ) -> VdrResult<String> {
+        let alias = nym_info.alias.clone().filter(|a| !a.trim().is_empty());
+        let mut request = self.pool.get_request_builder().build_nym_request(
+            &DidValue(submitter_did.to_string()),
+            &DidValue(nym_info.did.to_string()),
+            Some(nym_info.verkey.to_string()),
+            alias,
+            Some(role),
+            None,
+            None,
+        )?;
+
+        let result = if options.sign {
+            let sig_bytes = request.get_signature_input()?;
+            let signature = wallet.sign(sig_bytes.as_bytes()).await;
+            request.set_signature(&signature)?;
+            serde_json::to_string_pretty(&request.req_json).map_err(|e| {
+                VdrError::new(
+                    VdrErrorKind::Input, // Using Input for serialization errors
+                    Some(format!("Failed to serialize signed transaction: {}", e)),
+                    None,
+                )
+            })?
+        } else {
+            serde_json::to_string_pretty(&request.req_json).map_err(|e| {
+                VdrError::new(
+                    VdrErrorKind::Input, // Using Input for serialization errors
+                    Some(format!("Failed to serialize unsigned transaction: {}", e)),
+                    None,
+                )
+            })?
+        };
+
+        if options.send {
+            self._submit_request(&request).await
+        } else {
+            Ok(result)
+        }
+    }
+
+    // function to only send a transaction that is already signed
+    pub async fn prepare_transaction(
+        &self,
+        wallet: &IndyWallet,
+        signed_txn: &mut String,
+        options: &TransactionOptions,
+    ) -> VdrResult<String> {
+        let mut req = PreparedRequest::from_request_json(signed_txn)?;
+
+        println!("Request: {:?}", req.req_json.to_string());
+        // Get the request JSON to check existing signatures
+        let req_json = req.req_json.as_object().ok_or_else(|| {
+            VdrError::new(
+                VdrErrorKind::Input,
+                Some("Request JSON is not an object".to_string()),
+                None,
+            )
+        })?;
+
+        if options.sign {
+            if req_json.contains_key("signatures") {
+                return Err(VdrError::new(
+                    VdrErrorKind::Input,
+                    Some("Transaction already has signatures".to_string()),
+                    None,
+                ));
+            }
+
+            if req_json.contains_key("signature") {
+                return Err(VdrError::new(
+                    VdrErrorKind::Input,
+                    Some("Transaction uses legacy single signature format. Please use multi-signature format.".to_string()),
+                    None,
+                ));
+            }
+
+            match req.get_signature_input() {
+                Ok(sig_bytes) => {
+                    let signature = wallet.sign(sig_bytes.as_bytes()).await;
+                    req.set_multi_signature(&DidValue(wallet.did.clone()), &signature)
+                        .map_err(|e| {
+                            VdrError::new(
+                                VdrErrorKind::Input,
+                                Some("Failed to add multi-signature to request".to_string()),
+                                Some(Box::new(e)),
+                            )
+                        })?;
+                }
+                Err(e) => {
+                    return Err(VdrError::new(
+                        VdrErrorKind::Input,
+                        Some("Failed to get signature input from request".to_string()),
+                        Some(Box::new(e)),
+                    ));
+                }
+            }
+        }
+
+        if !options.send {
+            return serde_json::to_string_pretty(&req.req_json).map_err(|e| {
+                VdrError::new(
+                    VdrErrorKind::Input,
+                    Some(format!("Failed to serialize transaction: {}", e)),
+                    None,
+                )
+            });
+        }
+
+        self._submit_request(&req).await
+    }
+
+    async fn _sign_and_submit_request(
+        &self,
+        wallet: &IndyWallet,
+        request: &mut PreparedRequest,
+    ) -> VdrResult<String> {
+        let sig_bytes = request.get_signature_input()?;
+        let signature = wallet.sign(sig_bytes.as_bytes()).await;
+        request.set_signature(&signature)?;
+        self._submit_request(request).await
+    }
+
+    async fn _submit_request(&self, request: &PreparedRequest) -> VdrResult<String> {
+        let (request_result, _) = perform_ledger_request(&self.pool, request, None)
+            .await
+            .unwrap();
+        // std::thread::sleep(Duration::from_millis(500));
+        match request_result {
+            RequestResult::Reply(message) => {
+                if cfg!(debug_assertions) {
+                    println!("Reply: {:?}", message);
+                }
+                Ok(message)
+            }
+            RequestResult::Failed(error) => {
+                if cfg!(debug_assertions) {
+                    println!("Error: {:?}", error);
+                }
+                Err(error)
+            }
+        }
+    }
+
+
+    pub async fn publish_node(
+        &self,
+        wallet: &IndyWallet,
+        submitter_did: &str,
+        target_did: &str,
+        node_data: NodeOperationData,
+        options: &TransactionOptions,
+    ) -> VdrResult<String> {
+        let mut request = self
+            .pool
+            .get_request_builder()
+            .build_node_request(
+                &DidValue(submitter_did.to_string()),
+                &DidValue(target_did.to_string()),
+                node_data,
+            )?;
+    
+        let result = if options.sign {
+            let sig_bytes = request.get_signature_input()?;
+            let signature = wallet.sign(sig_bytes.as_bytes()).await;
+            request.set_signature(&signature)?;
+            serde_json::to_string_pretty(&request.req_json).map_err(|e| {
+                VdrError::new(
+                    VdrErrorKind::Input,
+                    Some(format!("Failed to serialize signed node transaction: {}", e)),
+                    None,
+                )
+            })?
+        } else {
+            serde_json::to_string_pretty(&request.req_json).map_err(|e| {
+                VdrError::new(
+                    VdrErrorKind::Input,
+                    Some(format!("Failed to serialize unsigned node transaction: {}", e)),
+                    None,
+                )
+            })?
+        };
+    
+        if options.send {
+            self._submit_request(&request).await
+        } else {
+            Ok(result)
+        }
+    }
+}
+
+================
+File: src/helpers/mod.rs
+================
+pub mod genesis;
+pub mod ledgers;
+pub mod wallet;
+pub mod workflow_guide;
+
+================
+File: src/helpers/wallet.rs
+================
+use anyhow::{anyhow, Context, Result};
+use aries_askar::kms::{KeyAlg, LocalKey};
+use sha2::{Digest, Sha256};
+
+const ED25519_PUBLIC_KEY_LENGTH: usize = 32;
+
+pub struct IndyWallet {
+    pub did: String,
+    pub verkey: String,
+    pub key: LocalKey,
+}
+
+impl IndyWallet {
+    pub async fn new(seed: Option<&str>, did_version_value: usize) -> anyhow::Result<IndyWallet> {
+        let (did, key, verkey) = IndyWallet::create_did(seed, Some(did_version_value))
+            .await
+            .context("Failed to create DID")?;
+        Ok(IndyWallet { did, verkey, key })
+    }
+
+    pub async fn sign(&self, bytes: &[u8]) -> Vec<u8> {
+        self.key
+            .sign_message(bytes, None)
+            .expect("Signing operation failed")
+    }
+
+    pub async fn create_did(
+        seed: Option<&str>,
+        version: Option<usize>,
+    ) -> anyhow::Result<(String, LocalKey, String)> {
+        let key = match seed {
+            Some(seed) => LocalKey::from_secret_bytes(KeyAlg::Ed25519, seed.as_bytes())
+                .context("Failed to create key from seed")?,
+            None => LocalKey::generate(KeyAlg::Ed25519, false)
+                .context("Failed to generate random key")?,
+        };
+
+        // Get public key bytes
+        let verkey_bytes = key
+            .to_public_bytes()
+            .context("Failed to get public key bytes")?;
+
+        // Verify public key length
+        if verkey_bytes.len() != ED25519_PUBLIC_KEY_LENGTH {
+            return Err(anyhow!(
+                "Invalid public key length: expected {}, got {}",
+                ED25519_PUBLIC_KEY_LENGTH,
+                verkey_bytes.len()
+            ));
+        }
+
+        // Generate verkey (base58 of public key)
+        let verkey = bs58::encode(verkey_bytes.as_ref()).into_string();
+
+        let did = match version {
+            Some(1) => {
+                // DID:SOV - first 16 bytes of verkey
+                bs58::encode(&verkey_bytes.as_ref()[..16]).into_string()
+            }
+            Some(2) | None => {
+                // DID:INDY - first 16 bytes of SHA256(verkey)
+                let mut hasher = Sha256::new();
+                hasher.update(verkey_bytes.as_ref());
+                let hash = hasher.finalize();
+                bs58::encode(&hash[..16]).into_string()
+            }
+            _ => return Err(anyhow!("Invalid DID version: must be 1 or 2")),
+        };
+
+        // Verify DID-verkey relationship for DID:INDY
+        if version == Some(2) || version.is_none() {
+            Self::verify_did_verkey_relationship(&did, &verkey)
+                .context("DID-verkey verification failed")?;
+        }
+
+        Ok((did, key, verkey))
+    }
+
+    /// Verifies that a DID was derived from a verkey according to DID:INDY specs
+    fn verify_did_verkey_relationship(did: &str, verkey: &str) -> Result<()> {
+        // Decode verkey from base58
+        let verkey_bytes = bs58::decode(verkey)
+            .into_vec()
+            .context("Failed to decode verkey from base58")?;
+
+        // Calculate hash
+        let mut hasher = Sha256::new();
+        hasher.update(&verkey_bytes);
+        let hash = hasher.finalize();
+
+        // Get expected DID
+        let expected_did = bs58::encode(&hash[..16]).into_string();
+
+        if did != expected_did {
+            return Err(anyhow!(
+                "DID-verkey mismatch: DID does not match first 16 bytes of SHA256(verkey)"
+            ));
+        }
+
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_did_indy_generation() {
+        let seed = "000000000000000000000000Trustee1";
+        let (did, _, verkey) = IndyWallet::create_did(Some(seed), Some(2)).await.unwrap();
+
+        // Verify DID-verkey relationship
+        IndyWallet::verify_did_verkey_relationship(&did, &verkey).unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_invalid_verkey() {
+        let invalid_verkey = bs58::encode(vec![0u8; 31]).into_string(); // Wrong length
+        let did = "GAAguaTbEHjvxL6i64YmAo";
+
+        assert!(IndyWallet::verify_did_verkey_relationship(did, &invalid_verkey).is_err());
+    }
+}
+
+================
+File: src/helpers/workflow_guide.rs
+================
+// In src/helpers/workflow_guide.rs
+
+use egui::{Color32, RichText, Ui};
+
+pub struct WorkflowGuide {
+    pub has_wallet: bool,
+    pub has_genesis: bool,
+}
+
+impl WorkflowGuide {
+    pub fn new(has_wallet: bool, has_genesis: bool) -> Self {
+        Self {
+            has_wallet,
+            has_genesis,
+        }
+    }
+
+    pub fn show(&self, ctx: &egui::Context) {
+        let current_step = if !self.has_wallet {
+            1
+        } else if !self.has_genesis {
+            2
+        } else {
+            3
+        };
+
+        egui::Window::new("Getting Started Guide")
+            .default_size([400.0, 500.0])
+            .show(ctx, |ui| {
+                // Header section
+                ui.add_space(8.0);
+                let header_text = RichText::new("Getting Started with IndyForge")
+                    .size(18.0)
+                    .strong()
+                    .color(Color32::WHITE);
+                ui.colored_label(Color32::from_rgb(50, 50, 50), header_text);
+
+                ui.add_space(4.0);
+                ui.colored_label(
+                    Color32::LIGHT_GRAY,
+                    "Follow these steps to start working with the Indy ledger. Complete each step in order."
+                );
+                ui.add_space(8.0);
+
+                egui::ScrollArea::vertical().show(ui, |ui| {
+                    // Step 1: Create Wallet
+                    self.show_step(
+                        ui,
+                        1,
+                        current_step,
+                        self.has_wallet,
+                        "Create Wallet",
+                        "Enter a 32-byte seed and select DID version to create your wallet",
+                        &[
+                            "Enter a 32-character seed in the input field",
+                            "Choose between DID:SOV (v1) or DID:INDY (v2)",
+                            "Click \"Create Wallet\" to generate your DID",
+                        ],
+                    );
+
+                    // Step 2: Configure Genesis
+                    self.show_step(
+                        ui,
+                        2,
+                        current_step,
+                        self.has_genesis,
+                        "Configure Genesis",
+                        "Select a local genesis file or enter a genesis URL",
+                        &[
+                            "Choose between local file or URL input",
+                            "For local file: Click \"Select Local Genesis File\"",
+                            "For URL: Enter the genesis URL and click \"Load URL\"",
+                        ],
+                    );
+
+                    // Step 3: Publish Transactions
+                    self.show_step(
+                        ui,
+                        3,
+                        current_step,
+                        false,
+                        "Publish Transactions",
+                        "Create and submit transactions to the ledger",
+                        &[
+                            "Select transaction type (NYM, Schema, or Custom)",
+                            "Fill in required transaction details",
+                            "Choose signing and submission options",
+                            "Review and submit your transaction",
+                        ],
+                    );
+
+                    ui.add_space(8.0);
+                });
+            });
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn show_step(
+        &self,
+        ui: &mut Ui,
+        step_number: u8,
+        current_step: u8,
+        is_complete: bool,
+        title: &str,
+        description: &str,
+        instructions: &[&str],
+    ) {
+        ui.horizontal(|ui| {
+            // Step indicator
+            let indicator_color = if is_complete {
+                Color32::from_rgb(34, 197, 94) // Green
+            } else if step_number == current_step {
+                Color32::from_rgb(59, 130, 246) // Blue
+            } else {
+                Color32::LIGHT_GRAY // Light gray for better visibility
+            };
+
+            let indicator_text = if is_complete {
+                "✓"
+            } else {
+                &step_number.to_string()
+            };
+
+            ui.add_space(4.0);
+            ui.label(
+                RichText::new(indicator_text)
+                    .color(if is_complete {
+                        Color32::WHITE
+                    } else {
+                        indicator_color
+                    })
+                    .size(16.0)
+                    .strong(),
+            );
+            ui.add_space(8.0);
+
+            ui.vertical(|ui| {
+                // Title
+                let title_text = RichText::new(title)
+                    .size(16.0)
+                    .color(if step_number == current_step {
+                        Color32::from_rgb(59, 130, 246) // Blue for current step
+                    } else if is_complete {
+                        Color32::from_rgb(34, 197, 94) // Green for completed
+                    } else {
+                        Color32::LIGHT_GRAY // Light gray for pending
+                    })
+                    .strong();
+                ui.label(title_text);
+
+                // Description
+                ui.label(
+                    RichText::new(description)
+                        .size(14.0)
+                        .color(Color32::LIGHT_GRAY),
+                );
+
+                // Show detailed instructions for current step
+                if step_number == current_step {
+                    ui.add_space(4.0);
+                    let frame = egui::Frame::none()
+                        .fill(Color32::from_rgb(20, 40, 80))
+                        .inner_margin(8.0)
+                        .rounding(4.0);
+
+                    frame.show(ui, |ui| {
+                        for instruction in instructions {
+                            ui.horizontal(|ui| {
+                                ui.label(RichText::new("→").color(Color32::from_rgb(59, 130, 246)));
+                                ui.label(
+                                    RichText::new(*instruction)
+                                        .size(14.0)
+                                        .color(Color32::LIGHT_GRAY),
+                                );
+                            });
+                        }
+                    });
+                }
+            });
+        });
+        ui.add_space(8.0);
+    }
+}
+
+================
+File: src/app.rs
+================
+use crate::helpers::genesis::GenesisSource;
+use crate::helpers::ledgers::IndyLedger;
+use crate::helpers::wallet::IndyWallet;
+use crate::helpers::workflow_guide::WorkflowGuide;
+use crate::indorser::endorser_tool;
+use crate::publish_tool::publish_tool_ui;
+use crate::wallet_tool::{create_wallet_ui, RecentUrls};
+use egui::TextBuffer;
+use futures_executor::block_on;
+use serde::{Deserialize, Serialize};
+use std::time::Duration;
+use tokio::time::timeout;
+
+
+#[derive(PartialEq, Eq, Deserialize, Serialize, Debug)]
+pub struct NodeInfo {
+    pub target_did: String,
+    pub node_ip: String,
+    pub node_port: String,
+    pub client_ip: String,
+    pub client_port: String,
+    pub alias: String,
+    pub blskey: String,
+    pub blskey_pop: String,
+    pub is_validator: bool,
+}
+
+impl Default for NodeInfo {
+    fn default() -> Self {
+        Self {
+            target_did: "".to_owned(),
+            node_ip: "".to_owned(),
+            node_port: "9701".to_owned(),
+            client_ip: "".to_owned(),
+            client_port: "9702".to_owned(),
+            alias: "".to_owned(),
+            blskey: "".to_owned(),
+            blskey_pop: "".to_owned(),
+            is_validator: true,
+        }
+    }
+}
+
+#[derive(PartialEq, Eq, Deserialize, Serialize, Debug)]
+pub enum MyRoles {
+    Author = 999,
+    Endorser = 101,
+    NetworkMonitor = 201,
+    Steward = 2,
+    Trustee = 0,
+}
+
+#[derive(serde::Deserialize, serde::Serialize, Debug)]
+pub struct TransactionOptions {
+    pub sign: bool,
+    pub send: bool,
+}
+
+impl Default for TransactionOptions {
+    fn default() -> Self {
+        Self {
+            sign: true,
+            send: true,
+        }
+    }
+}
+
+pub struct SchemaInfo {
+    pub schema_name: String,
+    pub schema_version: String,
+    pub attributes: Vec<String>,
+    pub new_attribute: String,
+    pub schema_done_clicked: bool,
+}
+
+pub struct ToolVisibility {
+    show_endorser: bool,
+    show_publish_tool: bool,
+    show_wallet_tool: bool,
+    show_workflow_guide: bool,
+}
+
+#[derive(Debug)]
+pub struct NymInfo {
+    pub(crate) did: String,
+    pub(crate) verkey: String,
+    pub(crate) alias: Option<String>,
+}
+#[derive(PartialEq, Eq, Deserialize, Serialize, Debug)]
+pub enum DIDVersion {
+    Sov,
+    Indy,
+}
+impl DIDVersion {
+    pub fn to_usize(&self) -> usize {
+        match self {
+            DIDVersion::Sov => 1,
+            DIDVersion::Indy => 2,
+        }
+    }
+}
+impl Default for MyRoles {
+    fn default() -> Self {
+        Self::Author
+    }
+}
+
+/// We derive Deserialize/Serialize so we can persist app state on shutdown.
+// #[derive(serde::Deserialize, serde::Serialize)]
+// #[serde(default)] // if we add new fields, give them default values when deserializing old state
+pub struct TemplateApp {
+    // Example stuff:
+    // #[serde(skip)] // This how you opt-out of serialization of a field
+    trustee_seed: String,
+    endorser_seed: String,
+    txn: String,
+    signed_txn_result: Option<String>,
+    tool_visibility: ToolVisibility,
+    genesis_source: Option<GenesisSource>,
+    nym_role: MyRoles,
+    did_version: DIDVersion,
+    wallet: Option<IndyWallet>,
+    publish_option: String,
+    nym_info: NymInfo,
+    ledgers: Option<IndyLedger>,
+    txn_result: String,
+    schema_info: SchemaInfo,
+    genesis_url_input: String,
+    ledger_connecting: bool,
+    ledger_error: Option<String>,
+    node_info: NodeInfo,
+    genesis_content: Option<String>,
+    show_genesis_content: bool,
+    current_genesis_path: Option<String>,
+    connection_start_time: Option<std::time::Instant>,
+    transaction_options: TransactionOptions,
+    recent_urls: RecentUrls,
+}
+
+impl Default for TemplateApp {
+    fn default() -> Self {
+        Self {
+            // Example stuff:
+            trustee_seed: "".to_owned(),
+            endorser_seed: "".to_owned(),
+            txn: "".to_owned(),
+            signed_txn_result: None,
+            tool_visibility: ToolVisibility {
+                show_endorser: true,
+                show_publish_tool: true,
+                show_wallet_tool: true,
+                show_workflow_guide: true,
+            },
+            genesis_source: Default::default(),
+            nym_role: Default::default(),
+            did_version: DIDVersion::Indy,
+            wallet: None,
+            publish_option: "".to_owned(),
+            nym_info: NymInfo {
+                did: "".to_owned(),
+                verkey: "".to_owned(),
+                alias: None,
+            },
+            ledgers: None,
+            txn_result: "".to_owned(),
+            schema_info: SchemaInfo {
+                schema_name: "".to_owned(),
+                schema_version: "".to_owned(),
+                attributes: Vec::new(),
+                new_attribute: "".to_owned(),
+                schema_done_clicked: false,
+            },
+            genesis_url_input: String::new(),
+            ledger_connecting: false,
+            ledger_error: None,
+            node_info: NodeInfo::default(),
+            genesis_content: None,
+            show_genesis_content: false,
+            current_genesis_path: None,
+            connection_start_time: None,
+            transaction_options: TransactionOptions::default(),
+            recent_urls: RecentUrls::new(10),
+        }
+    }
+}
+
+impl TemplateApp {
+    /// Called once before the first frame.
+    pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
+        // This is also where you can customize the look and feel of egui using
+        // `cc.egui_ctx.set_visuals` and `cc.egui_ctx.set_fonts`.
+
+        // Load previous app state (if any).
+        // Note that you must enable the `persistence` feature for this to work.
+        if let Some(storage) = cc.storage {
+            if let Some(urls_json) = storage.get_string("recent_urls") {
+                if let Ok(recent_urls) = serde_json::from_str(&urls_json) {
+                    return Self {
+                        recent_urls,
+                        ..Default::default()
+                    };
+                }
+            }
+        }
+
+        Default::default()
+    }
+}
+
+impl eframe::App for TemplateApp {
+    /// Called each time the UI needs repainting, which may be many times per second.
+    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        // Put your widgets into a `SidePanel`, `TopBottomPanel`, `CentralPanel`, `Window` or `Area`.
+        // For inspiration and more examples, go to https://emilk.github.io/egui
+
+        egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
+            // The top panel is often a good place for a menu bar:
+
+            egui::menu::bar(ui, |ui| {
+                // NOTE: no File->Quit on web pages!
+                let is_web = cfg!(target_arch = "wasm32");
+                if !is_web {
+                    ui.menu_button("File", |ui| {
+                        if ui.button("Quit").clicked() {
+                            ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+                        }
+                    });
+                    ui.add_space(16.0);
+                }
+
+                egui::widgets::global_dark_light_mode_buttons(ui);
+            });
+        });
+        egui::SidePanel::right("side_panel")
+            .min_width(150.0)
+            .show(ctx, |ui| {
+                ui.vertical_centered(|ui| {
+                    ui.heading("Tools");
+                });
+                // Add a checkbox to toggle the visibility of the "Indorser" window
+                ui.checkbox(&mut self.tool_visibility.show_endorser, "Endorser Tool");
+                ui.checkbox(&mut self.tool_visibility.show_publish_tool, "Publish Tool");
+                ui.checkbox(&mut self.tool_visibility.show_wallet_tool, "Wallet Tool");
+                ui.checkbox(&mut self.tool_visibility.show_workflow_guide, "Guide");
+                ui.separator();
+                if ui.button("Reset Windows").clicked() {
+                    ui.ctx().memory_mut(|mem| mem.reset_areas());
+                }
+            });
+        egui::CentralPanel::default().show(ctx, |ui| {
+            // The central panel the region left after adding TopPanel's and SidePanel's
+            // Show the guide as a window if enabled
+            if self.tool_visibility.show_workflow_guide {
+                let workflow_guide = WorkflowGuide::new(
+                    self.wallet.is_some(),
+                    self.genesis_source.is_some()
+                );
+                workflow_guide.show(ctx);
+            }
+            // Indorser Tool section
+            if self.tool_visibility.show_endorser {
+                // Only show the "Indorser" window if `show_indorser` is true
+                egui::Window::new("Endorser Tool")
+                    // .default_pos(egui::pos2(0.0, 0.0))
+                    .show(ui.ctx(), |ui| {
+                        endorser_tool(
+                            ui,
+                            &mut self.endorser_seed,
+                            &mut self.txn,
+                            &mut self.signed_txn_result,
+                            &mut self.did_version,
+                        );
+                    });
+            }
+
+
+
+            if self.tool_visibility.show_wallet_tool {
+            // Wallet Tool section
+            egui::Window::new("Wallet Tool")
+                .default_size([600.0, 300.0])
+                .show(ui.ctx(), |ui| {
+                    ui.heading("Wallet Tool");
+                    ui.separator();
+                    ui.label("Tool that create a temporary wallet and hold the DID used by the other tools");
+                    create_wallet_ui(ui,
+                                     &mut self.trustee_seed,
+                                     &mut self.wallet,
+                                     &mut self.genesis_source,
+                                     &mut self.did_version,
+                                     &mut self.genesis_url_input,
+                                     &mut self.recent_urls,)
+                        .expect("Something went wrong with the wallet creation");
+                });
+            }
+            if self.tool_visibility.show_publish_tool {
+                egui::Window::new("Publish Tool")
+                    .default_size([600.0, 300.0])
+                    .show(ui.ctx(), |ui| {
+                        ui.heading("Publish Tool");
+                        ui.separator();
+
+                        // Check wallet and genesis separately
+                        let has_wallet = self.wallet.is_some();
+                        let has_genesis = self.genesis_source.is_some();
+
+                        // Check if genesis source has changed
+                        if let Some(genesis_source) = &self.genesis_source {
+                            let new_path = match genesis_source {
+                                GenesisSource::LocalFile(path) => Some(path.clone()),
+                                GenesisSource::Url(url) => Some(url.clone()),
+                            };
+
+                            if new_path != self.current_genesis_path {
+                                // Genesis source has changed, reset everything
+                                self.current_genesis_path = new_path;
+                                self.ledgers = None;
+                                self.ledger_error = None;
+                                self.genesis_content = None;
+                                self.ledger_connecting = false;
+                            }
+                        }
+
+                        if !has_wallet {
+                            ui.colored_label(
+                                egui::Color32::LIGHT_RED,
+                                "Please create a wallet first"
+                            );
+                        }
+                        if !has_genesis {
+                            ui.colored_label(
+                                egui::Color32::LIGHT_RED,
+                                "Please select a genesis file first"
+                            );
+                        }
+
+                        // Add genesis viewer if we have a genesis source
+                        if has_genesis {
+                            ui.separator();
+                            if ui.button(
+                                if self.show_genesis_content {
+                                    "Hide Genesis Content"
+                                } else {
+                                    "Show Genesis Content"
+                                }
+                            ).clicked() {
+                                self.show_genesis_content = !self.show_genesis_content;
+                            }
+
+                            if self.show_genesis_content {
+                                match &self.genesis_source {
+                                    Some(GenesisSource::LocalFile(path)) => {
+                                        if let Ok(content) = std::fs::read_to_string(path) {
+                                            show_genesis_content(ui, &content);
+                                        } else {
+                                            ui.colored_label(egui::Color32::RED, "Failed to read genesis file");
+                                        }
+                                    }
+                                    Some(GenesisSource::Url(_url)) => {
+                                        if self.genesis_content.is_none() {
+                                            ui.spinner();
+                                            ui.label("Loading genesis content...");
+
+                                            if let Ok(content) = block_on(self.genesis_source.as_ref().unwrap().get_content()) {
+                                                self.genesis_content = Some(content);
+                                            } else {
+                                                ui.colored_label(egui::Color32::RED, "Failed to fetch genesis content");
+                                            }
+                                        }
+
+                                        if let Some(content) = &self.genesis_content {
+                                            show_genesis_content(ui, content);
+                                        }
+                                    }
+                                    None => {}
+                                }
+                            }
+                        }
+
+
+                        // Only proceed if we have both
+                        if has_wallet && has_genesis {
+                            // Check if we're already connected and not in an error state
+                            if self.ledgers.is_none() && !self.ledger_connecting && self.ledger_error.is_none() {
+                                // Set connecting flag to true
+                                self.ledger_connecting = true;
+
+                                // Show connecting indicator
+                                ui.horizontal(|ui| {
+                                    ui.spinner();
+                                    ui.label("Connecting to ledger...");
+                                    if let Some(start_time) = self.connection_start_time {
+                                        let elapsed = start_time.elapsed().as_secs();
+                                        if elapsed >= 20 {  // Overall timeout of 20 seconds
+                                            self.ledger_connecting = false;
+                                            self.ledger_error = Some("Connection attempt timed out after 20 seconds".to_string());
+                                            self.connection_start_time = None;
+                                        } else {
+                                            ui.label(format!("({} seconds)", elapsed));
+                                        }
+                                    }
+                                });
+
+                                if self.ledger_error.is_none() {  // Only try connection if we haven't timed out
+                                    // Move connection attempt into a block_on block to ensure completion
+                                    let connection_result = block_on(async {
+                                        // Wrap the entire connection process in a timeout
+                                        timeout(Duration::from_secs(20), async {
+                                            match IndyLedger::new(self.genesis_source.clone().unwrap()).await {
+                                                Ok(ledger) => {
+                                                    match ledger.check_connection().await {
+                                                        Ok(true) => {
+                                                            log::info!("Successfully connected to ledger");
+                                                            Ok(ledger)
+                                                        }
+                                                        Ok(false) => {
+                                                            Err(anyhow::anyhow!("Connected to nodes but ledger is not responding correctly"))
+                                                        }
+                                                        Err(e) => {
+                                                            Err(anyhow::anyhow!("Failed to verify ledger connection: {}", e))
+                                                        }
+                                                    }
+                                                },
+                                                Err(e) => {
+                                                    Err(anyhow::anyhow!("Failed to connect to ledger: {}. Check your genesis file configuration.", e))
+                                                }
+                                            }
+                                        }).await.unwrap_or_else(|_| Err(anyhow::anyhow!("Connection attempt timed out")))
+                                    });
+
+                                    // Handle connection result
+                                    match connection_result {
+                                        Ok(ledger) => {
+                                            self.ledgers = Some(ledger);
+                                            self.ledger_error = None;
+                                        }
+                                        Err(e) => {
+                                            log::error!("{}", e);
+                                            self.ledger_error = Some(e.to_string());
+                                        }
+                                    }
+
+                                    self.ledger_connecting = false;
+                                    self.connection_start_time = None;
+                                }
+                            }
+
+                            // Periodically check connection if we're connected
+                            if let Some(ledger) = &self.ledgers {
+                                if ui.input(|i| i.time).floor() as i64 % 30 == 0 { // Check every 30 seconds
+                                    match block_on(ledger.check_connection()) {
+                                        Ok(true) => {
+                                            // Connection still good
+                                            if let Some(error) = &mut self.ledger_error {
+                                                if error.contains("Connection lost") {
+                                                    self.ledger_error = None;
+                                                }
+                                            }
+                                        }
+                                        Ok(false) | Err(_) => {
+                                            // Connection lost
+                                            self.ledger_error = Some("Connection lost to ledger. Retry?".to_string());
+                                            self.ledgers = None;
+                                        }
+                                    }
+                                }
+                            }
+
+                            // First check if we need to show error and get retry action
+                            let should_retry = if self.ledger_error.is_some() {
+                                ui.separator();
+                                ui.horizontal(|ui| {
+                                    ui.colored_label(
+                                        egui::Color32::RED,
+                                        "❌ Connection Error"
+                                    );
+                                    ui.button("🔄 Retry Connection").clicked()
+                                }).inner
+                            } else {
+                                false
+                            };
+
+                            // Then show error message if any
+                            if let Some(error) = &self.ledger_error {
+                                egui::ScrollArea::vertical()
+                                    .max_height(100.0)
+                                    .show(ui, |ui| {
+                                        ui.colored_label(
+                                            egui::Color32::LIGHT_RED,
+                                            error
+                                        );
+                                    });
+                            }
+
+                            // Handle retry action after releasing the borrow
+                            if should_retry {
+                                self.ledgers = None;
+                                self.ledger_error = None;
+                                self.ledger_connecting = false;  // Ensure connecting state is reset
+                            }
+
+                            // Continue with UI if connected successfully
+                            if self.ledgers.is_some() {
+                                publish_tool_ui(
+                                    ui,
+                                    &mut self.wallet,
+                                    &mut self.publish_option,
+                                    &mut self.nym_role,
+                                    &mut self.nym_info,
+                                    &mut self.genesis_source,
+                                    &mut self.ledgers,
+                                    &mut self.txn_result,
+                                    &mut self.schema_info,
+                                    &mut self.txn,
+                                    &mut self.transaction_options,
+                                ).expect("Failed to render publish tool UI");
+                            }
+                        }
+                    });
+            }
+        });
+    }
+
+    /// Called by the frame work to save state before shutdown.
+    // fn save(&mut self, storage: &mut dyn eframe::Storage) {
+    //     eframe::set_value(storage, eframe::APP_KEY, self);
+    // }
+
+    fn save(&mut self, storage: &mut dyn eframe::Storage) {
+        if !cfg!(test) {
+            // Don't save during tests
+            if let Ok(urls_json) = serde_json::to_string(&self.recent_urls) {
+                storage.set_string("recent_urls", urls_json);
+            }
+        }
+    }
+}
+
+// Add this helper function at the bottom of the file
+fn show_genesis_content(ui: &mut egui::Ui, content: &str) {
+    egui::ScrollArea::vertical()
+        .max_height(200.0)
+        .show(ui, |ui| {
+            ui.add(
+                egui::TextEdit::multiline(&mut content.as_str())
+                    .desired_width(f32::INFINITY)
+                    .desired_rows(10)
+                    .interactive(false), // This makes it non-interactive/read-only
+            );
+
+            if ui.button("Copy Genesis Content").clicked() {
+                ui.output_mut(|o| o.copied_text = content.to_string());
+            }
+        });
+}
+
+================
+File: src/endorsing.rs
+================
+
+
+================
+File: src/helper.rs
+================
+use indy_data_types::did::{generate_did, DidValue};
+use indy_data_types::keys::PrivateKey;
+use indy_vdr::common::error::{VdrError, VdrErrorKind, VdrResult};
+use indy_vdr::pool::PreparedRequest;
+use serde_json::Value;
+
+pub fn create_did(seed: String, version: usize) -> anyhow::Result<DidInfo> {
+    let (did, prv, vk) = generate_did(Some(seed.as_bytes()), Some(version))?;
+    let endorser_did = DidInfo {
+        did: DidValue::from(did.to_string()),
+        privatekey: prv,
+        verkey: vk.to_string(),
+    };
+
+    anyhow::Ok(endorser_did)
+}
+
+pub fn sign_transaction(data: DidInfo, txn: String) -> VdrResult<Value> {
+    let mut req = PreparedRequest::from_request_json(txn)?;
+    let sigin = req.get_signature_input()?;
+    let sig = data.privatekey.sign(sigin.as_bytes()).map_err(|e| {
+        VdrError::new(
+            VdrErrorKind::Input, // Using Input as it's related to input processing
+            Some(format!("Signing failed: {}", e)),
+            None,
+        )
+    })?;
+    req.set_multi_signature(&data.did, &sig)?;
+    Ok(req.req_json)
+}
+
+#[derive(Debug)]
+pub struct DidInfo {
+    pub(crate) did: DidValue,
+    pub(crate) privatekey: PrivateKey,
+    pub(crate) verkey: String,
+}
+
+impl Default for DidInfo {
+    fn default() -> Self {
+        Self {
+            did: DidValue("".to_string()),
+            privatekey: PrivateKey::new(vec![], None),
+            verkey: String::default(),
+        }
+    }
+}
+
+/// Sign a NYM transaction request with a DID
+// pub fn sign_nym_request(nym_request: &mut PreparedRequest, trustee: &DidInfo) -> VdrResult<()> {
+//     let sigin = nym_request.get_signature_input()?;
+//     let sig = trustee.privatekey.sign(sigin.as_bytes()).unwrap();
+//     nym_request.set_multi_signature(&trustee.did, &sig)?;
+//     Ok(())
+// }
+
+// -- Region Test Section --
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use indy_data_types::keys::KeyType;
+    use serde_json::json;
+
+    #[test]
+    fn test_create_did_sov() {
+        let seed = "000000000000000000000000Trustee1".to_string();
+        let version = 1;
+        let result = create_did(seed, version);
+
+        assert!(result.is_ok());
+
+        let did_info = result.unwrap();
+        assert_eq!(did_info.did.to_string(), "V4SGRU86Z58d6TV7PBUe6f");
+        assert_eq!(
+            did_info.verkey,
+            "GJ1SzoWzavQYfNL9XkaJdrQejfztN4XqdsiV4ct3LXKL"
+        );
+        assert!(matches!(did_info.privatekey.alg, KeyType::ED25519));
+    }
+
+    #[test]
+    fn test_create_did_indy() {
+        let seed = "000000000000000000000000Trustee1".to_string();
+        let version = 2;
+        let result = create_did(seed, version);
+
+        assert!(result.is_ok());
+
+        let did_info = result.unwrap();
+        assert_eq!(did_info.did.to_string(), "GAAguaTbEHjvxL6i64YmAo");
+        assert_eq!(
+            did_info.verkey,
+            "GJ1SzoWzavQYfNL9XkaJdrQejfztN4XqdsiV4ct3LXKL"
+        );
+        assert!(matches!(did_info.privatekey.alg, KeyType::ED25519));
+    }
+
+    #[test]
+    fn test_sign_transaction() {
+        // Create mock DidInfo
+        let did_info = create_did("000000000000000000000000Trustee1".to_string(), 2);
+        assert!(did_info.is_ok());
+        let did_info = did_info.unwrap();
+
+        // Create mock transaction
+        let txn = json!({
+            "identifier": "Bhhsxc585EVgbbmosZr65J",
+            "operation": {
+                "dest": "VsKV7grR1BUE29mG2Fm2kX",
+                "role": "101",
+                "type": "1",
+                "verkey": "GjZWsBLgZCR18aL468JAT7w9CZRiBnpxUPPgyQxh4voa"
+            },
+            "protocolVersion": 2,
+            "reqId": 1689080604840377700i64
+        });
+        // Call sign_transaction
+        let result = sign_transaction(did_info, serde_json::to_string(&txn).unwrap());
+        // Assert function returns Ok
+        assert!(result.is_ok());
+
+        // Assert the result matches the expected signed transaction
+        // Note: The expected signed transaction is a placeholder. Replace it with the actual expected signed transaction.
+        let expected_signed_transaction = json!({
+            "identifier": "Bhhsxc585EVgbbmosZr65J",
+            "operation": {
+                "dest": "VsKV7grR1BUE29mG2Fm2kX",
+                "role": "101",
+                "type": "1",
+                "verkey": "GjZWsBLgZCR18aL468JAT7w9CZRiBnpxUPPgyQxh4voa"
+            },
+            "protocolVersion": 2,
+            "reqId": 1689080604840377700i64,
+            "signatures": {
+                "GAAguaTbEHjvxL6i64YmAo": "5xtuhdLH1iZvNVeeAr5yuQD9RBsZ17zW5iwTqyxrWk89LaYpkLRGg3juuyiJNgwnSHMNq7nfXPx8AMvhfvHnXVQX"
+            }
+        });
+        assert_eq!(result.unwrap(), expected_signed_transaction);
+    }
+}
+
+// -- End Region Test Section --
+
+================
+File: src/indorser.rs
+================
+use crate::app::DIDVersion;
+use crate::helper::{create_did, sign_transaction};
+use egui::Ui;
+
+pub fn endorser_tool(
+    ui: &mut Ui,
+    endorser_seed: &mut String,
+    txn: &mut String,
+    signed_txn_result: &mut Option<String>,
+    did_version: &mut DIDVersion,
+) {
+    ui.label("Sign Txn with Endorser DID");
+    // Add more UI elements inside the nested window
+    ui.heading("Endorser");
+
+    ui.vertical(|ui| {
+        ui.label("Endorser seed: ");
+        ui.add(
+            egui::TextEdit::singleline(endorser_seed)
+                .char_limit(32)
+                .hint_text("Enter 32 bytes seed"),
+        );
+        ui.label(format!("Length: {}", endorser_seed.len()));
+        ui.label("Select the version for the DID.  did:Sov is 1, did:Indy is 2");
+        egui::ComboBox::from_id_source("version_dropdown")
+            .selected_text(format!("{:?}", did_version))
+            .show_ui(ui, |ui| {
+                ui.selectable_value(&mut *did_version, DIDVersion::Sov, "SOV");
+                ui.selectable_value(&mut *did_version, DIDVersion::Indy, "Indy");
+            });
+    });
+    ui.separator();
+    if endorser_seed.len() == 32 {
+        let endorser_did = create_did(endorser_seed.clone(), did_version.to_usize()).unwrap();
+        ui.colored_label(
+            egui::Color32::KHAKI,
+            format!("DID: {:?}", endorser_did.did.0),
+        );
+        ui.colored_label(
+            egui::Color32::KHAKI,
+            format!("Verkey: {:?}", endorser_did.verkey),
+        );
+        ui.separator();
+
+        let response_txn = ui.add(
+            egui::TextEdit::multiline(txn)
+                .hint_text("Input Transaction")
+                .desired_width(f32::INFINITY),
+        );
+        ui.separator();
+        if response_txn.changed() {
+            let signed_txn = sign_transaction(endorser_did, txn.clone());
+            match signed_txn {
+                Ok(txn) => {
+                    let unescaped_json = serde_json::to_string(&txn).unwrap();
+                    *signed_txn_result = Some(unescaped_json.clone().to_string());
+                }
+                Err(e) => {
+                    *signed_txn_result = Some(format!("Error: {:?}", e));
+                }
+            }
+        }
+
+        ui.vertical(|ui| {
+            ui.label("Signed Transaction:");
+            if let Some(result) = &signed_txn_result {
+                // ui.colored_label(egui::Color32::GREEN, "Signed Transaction:");
+                ui.colored_label(egui::Color32::GREEN, result.clone());
+
+                ui.separator();
+                // Add a button to copy the unescaped_json content
+                if ui.button("Copy output").clicked() {
+                    let r = result.clone();
+                    ui.output_mut(|o| o.copied_text = r);
+                };
+            }
+        });
+        ui.separator();
+        // if ui.button("Apply Transaction").clicked() {
+        //     // Apply the signed transaction to the ledger
+        //     // apply_transaction(&signed_txn_result);
+        //     write_signed_transaction_to_ledger(signed_txn_result.clone());
+        // }
+        ui.separator();
+        ui.with_layout(egui::Layout::bottom_up(egui::Align::LEFT), |ui| {
+            egui::warn_if_debug_build(ui);
+        });
+    }
+}
+
+================
+File: src/lib.rs
+================
+#![warn(clippy::all, rust_2018_idioms)]
+
+pub use app::TemplateApp;
+
+mod app;
+mod endorsing;
+mod helper;
+mod helpers;
+mod indorser;
+mod publish_tool;
+mod wallet_tool;
+
+================
+File: src/main.rs
+================
+#![warn(clippy::all, rust_2018_idioms)]
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
+
+// When compiling natively:
+#[cfg(not(target_arch = "wasm32"))]
+#[tokio::main]
+async fn main() -> eframe::Result<()> {
+    env_logger::init(); // Log to stderr (if you run with `RUST_LOG=debug`).
+
+    let native_options = eframe::NativeOptions {
+        viewport: egui::ViewportBuilder::default()
+            .with_inner_size([1200.0, 800.0])
+            .with_min_inner_size([500.0, 400.0])
+            .with_icon(
+                // NOTE: Adding an icon is optional
+                eframe::icon_data::from_png_bytes(&include_bytes!("../assets/icon-256.png")[..])
+                    .expect("Failed to load icon"),
+            ),
+        ..Default::default()
+    };
+    eframe::run_native(
+        "IndyForge",
+        native_options,
+        Box::new(|cc| Box::new(indyforge::TemplateApp::new(cc))),
+    )
+}
+
+// When compiling to web using trunk:
+#[cfg(target_arch = "wasm32")]
+fn main() {
+    // Redirect `log` message to `console.log` and friends:
+    eframe::WebLogger::init(log::LevelFilter::Debug).ok();
+
+    let web_options = eframe::WebOptions::default();
+
+    wasm_bindgen_futures::spawn_local(async {
+        eframe::WebRunner::new()
+            .start(
+                "the_canvas_id", // hardcode it
+                web_options,
+                Box::new(|cc| Box::new(indorser::TemplateApp::new(cc))),
+            )
+            .await
+            .expect("failed to start eframe");
+    });
+}
+
+================
+File: src/publish_tool.rs
+================
+use crate::app::{MyRoles, NymInfo, SchemaInfo, TransactionOptions, NodeInfo};
+use crate::helpers::genesis::GenesisSource;
+use crate::helpers::ledgers::IndyLedger;
+use crate::helpers::wallet::IndyWallet;
+use derive_more::Display;
+use egui::{ComboBox, Ui};
+use futures_executor::block_on;
+use indy_data_types::anoncreds::schema::{
+    AttributeNames, Schema as IndySchema, SchemaV1 as IndySchemaV1,
+};
+use indy_data_types::did::DidValue;
+use indy_data_types::{SchemaId, Validatable};
+use indy_vdr::ledger::constants::{LedgerRole, UpdateRole};
+use indy_vdr::ledger::requests::node::{NodeOperationData, Services};
+
+#[derive(PartialEq, Eq, Debug, Display)]
+enum PublishEntities {
+    CredDef,
+    Nym,
+    Attrib,
+    Schema,
+    Node,
+    Custom,
+}
+
+// FIXME: This function has too many arguments. Consider grouping them into a struct.
+#[allow(clippy::too_many_arguments)]
+pub fn publish_tool_ui(
+    ui: &mut Ui,
+    wallet: &mut Option<IndyWallet>,
+    publish_option: &mut String,
+    nym_role: &mut MyRoles,
+    nym_info: &mut NymInfo,
+    node_info: &mut NodeInfo,
+    genesis_source: &mut Option<GenesisSource>,
+    ledgers: &mut Option<IndyLedger>,
+    txn_result: &mut String,
+    schema_info: &mut SchemaInfo,
+    txn: &mut String,
+    transaction_options: &mut TransactionOptions,
+) -> anyhow::Result<()> {
+    ui.label("Publish something on a ledger");
+
+    let options = vec![
+        //PublishEntities::Attrib,
+        //PublishEntities::CredDef,
+        PublishEntities::Nym,
+        PublishEntities::Schema,
+        PublishEntities::Node,
+        PublishEntities::Custom,
+    ];
+
+    ui.separator();
+    ui.heading("Transaction Options");
+    ui.horizontal(|ui| {
+        ui.checkbox(&mut transaction_options.sign, "Sign Transaction");
+        ui.checkbox(&mut transaction_options.send, "Send to Ledger");
+    });
+
+    if !transaction_options.send && !transaction_options.sign {
+        ui.colored_label(
+            egui::Color32::YELLOW,
+            "⚠️ Transaction will be prepared without signing",
+        );
+    } else if !transaction_options.send {
+        ui.colored_label(
+            egui::Color32::LIGHT_GREEN,
+            "ℹ️ Transaction will be signed but not sent",
+        );
+    }
+
+    ComboBox::from_id_source("publish_option")
+        .selected_text(publish_option.as_str())
+        .show_ui(ui, |ui| {
+            for option in &options {
+                ui.selectable_value(publish_option, option.to_string(), option.to_string());
+            }
+        });
+
+    if *publish_option == PublishEntities::CredDef.to_string() {
+        ui.heading("Cred Def registration");
+    } else if *publish_option == PublishEntities::Attrib.to_string() {
+        ui.heading("Attrib registration");
+    } else if *publish_option == PublishEntities::Schema.to_string() {
+        //region SCHEMA REGISTRATION
+        ui.heading("Schema registration");
+        //build a form that ask for the schema name, version, and attributes.  You can add extra attributes by clicking a+ sign
+        //and remove them by clicking a - sign.  The form should have a submit button that will send the schema to the ledger.
+
+        // Initialize a vector to hold the attributes
+        ui.add(
+            egui::TextEdit::singleline(&mut schema_info.schema_name).hint_text("Enter schema name"),
+        );
+        ui.add(
+            egui::TextEdit::singleline(&mut schema_info.schema_version)
+                .hint_text("Enter schema version"),
+        );
+        let version_parts: Vec<&str> = schema_info.schema_version.split('.').collect();
+        if version_parts.len() != 3
+            || version_parts
+                .iter()
+                .any(|part| part.parse::<u32>().is_err())
+        {
+            // Handle the error, e.g., by displaying an error message
+            ui.label("Error: The version must have three parts, separated by dots, and each part must be a number.");
+        }
+        ui.horizontal(|ui| {
+            ui.add(
+                egui::TextEdit::singleline(&mut schema_info.new_attribute)
+                    .hint_text("Enter new attribute"),
+            );
+            if ui.button("+").clicked() && !schema_info.new_attribute.is_empty() {
+                {
+                    schema_info
+                        .attributes
+                        .push(schema_info.new_attribute.clone());
+                    schema_info.new_attribute.clear();
+                }
+            }
+        });
+
+        let mut to_remove = Vec::new();
+        for (index, attribute) in schema_info.attributes.iter().enumerate() {
+            ui.horizontal(|ui| {
+                ui.label(attribute);
+                if ui.button("-").clicked() {
+                    to_remove.push(index);
+                }
+            });
+        }
+        for index in to_remove.iter().rev() {
+            schema_info.attributes.remove(*index);
+        }
+        if ui.button("Schema Done").clicked() {
+            schema_info.schema_done_clicked = true;
+        }
+
+        // Check the variable to decide whether to display the schema information or not
+        if schema_info.schema_done_clicked {
+            // Display the full schema struct (minus "new_attribute") on the right side
+            ui.colored_label(egui::Color32::KHAKI, "Schema:");
+            ui.label(format!("Name: {}", schema_info.schema_name));
+            ui.label(format!("Version: {}", schema_info.schema_version));
+            ui.colored_label(egui::Color32::KHAKI, "Attributes:");
+            for attribute in &schema_info.attributes {
+                ui.label(attribute);
+            }
+            let wallet_ref = wallet.as_ref().unwrap();
+            let schema_to_publish: IndySchema = IndySchema::SchemaV1(IndySchemaV1 {
+                id: SchemaId::new(
+                    &DidValue(wallet_ref.did.clone()),
+                    &schema_info.schema_name.clone(),
+                    &schema_info.schema_version.clone(),
+                ),
+                name: schema_info.schema_name.clone(),
+                version: schema_info.schema_version.clone(),
+                attr_names: AttributeNames::from(schema_info.attributes.clone()),
+                seq_no: None,
+            });
+            ui.label(format!("Schema to publish: {:?}", schema_to_publish));
+            let is_schema_valid = schema_to_publish.validate();
+
+            match is_schema_valid {
+                Ok(_) => ui.label("The schema seems valid."),
+                Err(e) => ui.label(format!("Invalid schema: {} ", e)),
+            };
+            if ui.button("Register Schema").clicked() && genesis_source.is_some() {
+                ui.label("Registering Schema...");
+
+                let wallet_ref = wallet.as_ref().unwrap();
+                if let Some(ledger) = ledgers {
+                    match block_on(IndyLedger::publish_schema(
+                        ledger,
+                        wallet_ref,
+                        &wallet_ref.did,
+                        &schema_to_publish,
+                        transaction_options,
+                    )) {
+                        Ok(result) => {
+                            // Store only the raw transaction JSON
+                            *txn_result = result;
+
+                            // Display additional context in the UI only
+                            ui.label(if transaction_options.send {
+                                "Schema transaction submitted successfully:"
+                            } else if transaction_options.sign {
+                                "Signed schema transaction (not submitted):"
+                            } else {
+                                "Unsigned schema transaction:"
+                            });
+
+                            // Display the formatted transaction
+                            ui.monospace(&*txn_result);
+                        }
+                        Err(e) => {
+                            *txn_result = e.to_string();
+                        }
+                    }
+                }
+            }
+        }
+    //endregion
+    } else if *publish_option == PublishEntities::Custom.to_string() {
+        //region CUSTOM REGISTRATION
+        ui.heading("Custom txn registration");
+        ui.separator();
+
+        ui.colored_label(
+            egui::Color32::from_rgb(144, 238, 144),
+            "Paste your transaction below",
+        );
+
+        ui.add(
+            egui::TextEdit::multiline(txn)
+                .hint_text("Input Transaction")
+                .desired_width(f32::INFINITY),
+        );
+        ui.separator();
+
+        // Add explanation of current options before preparation
+        if !transaction_options.sign && !transaction_options.send {
+            ui.colored_label(
+                egui::Color32::YELLOW,
+                "Transaction will be prepared without signing",
+            );
+        } else if !transaction_options.send {
+            ui.colored_label(
+                egui::Color32::LIGHT_GREEN,
+                "Transaction will be signed but not sent",
+            );
+        }
+
+        if ui.button("Prepare Custom Transaction").clicked() {
+            if let Some(ledger) = ledgers {
+                match block_on(ledger.prepare_transaction(
+                    wallet.as_ref().unwrap(),
+                    txn,
+                    transaction_options,
+                )) {
+                    Ok(result) => {
+                        *txn_result = result;
+                    }
+                    Err(e) => {
+                        *txn_result = format!("Error: {}", e);
+                    }
+                }
+            }
+        }
+
+        ui.separator();
+
+        //endregion
+    } else if *publish_option == PublishEntities::Nym.to_string() {
+        ui.vertical(|ui| {
+            ui.heading("NYM Registration");
+            ui.colored_label(
+                egui::Color32::from_rgb(144, 238, 144),
+                "Enter the NYM DID and Verkey that you want to register",
+            );
+            ui.colored_label(egui::Color32::from_rgb(144, 238, 144), "NYM DID: ");
+            ui.add(
+                egui::TextEdit::singleline(&mut nym_info.did)
+                    .char_limit(32)
+                    .hint_text("NYM DID"),
+            );
+            ui.label("NYM Verkey: ");
+            ui.add(egui::TextEdit::singleline(&mut nym_info.verkey).hint_text("NYM Verkey"));
+        });
+        let is_valid_did = &DidValue((*nym_info.did.to_string()).parse()?).validate();
+        match is_valid_did {
+            Ok(_) => ui.label("The entered NYM DID seems valid."),
+            Err(e) => ui.label(format!("Invalid NYM DID: {} ", e)),
+        };
+        let is_valid_verkey = &DidValue((*nym_info.verkey.to_string()).parse()?).validate();
+        match is_valid_verkey {
+            Ok(_) => ui.label("The entered NYM Verkey seems valid."),
+            Err(e) => ui.label(format!("Invalid NYM Verkey: {} ", e)),
+        };
+        ui.colored_label(egui::Color32::from_rgb(144, 238, 144), "NYM Alias:");
+        if let Some(alias) = &mut nym_info.alias {
+            ui.add(egui::TextEdit::singleline(alias).hint_text("NYM Alias"));
+            if alias.trim().is_empty() {
+                nym_info.alias = None;
+            }
+        } else {
+            let mut new_alias = String::new();
+            ui.add(egui::TextEdit::singleline(&mut new_alias).hint_text("NYM Alias"));
+            if !new_alias.trim().is_empty() {
+                nym_info.alias = Some(new_alias);
+            }
+        }
+
+        ui.label("Select the role for the NYM");
+        egui::ComboBox::from_id_source("my_role_nym")
+            .selected_text(format!("{:?}", nym_role))
+            .show_ui(ui, |ui| {
+                ui.selectable_value(&mut *nym_role, MyRoles::Author, "Author");
+                ui.selectable_value(&mut *nym_role, MyRoles::Endorser, "Endorser");
+                ui.selectable_value(&mut *nym_role, MyRoles::NetworkMonitor, "Network Monitor");
+                ui.selectable_value(&mut *nym_role, MyRoles::Steward, "Steward");
+                ui.selectable_value(&mut *nym_role, MyRoles::Trustee, "Trustee");
+            });
+
+        // Check each field and add the name of the missing fields to a vector
+        let mut missing_fields = Vec::new();
+        if nym_info.did.is_empty() || !is_valid_did.is_ok() {
+            missing_fields.push("NYM DID");
+        }
+        if nym_info.verkey.is_empty() || !is_valid_verkey.is_ok() {
+            missing_fields.push("NYM Verkey");
+        }
+        if genesis_source.is_none() {
+            missing_fields.push("genesis file");
+        }
+
+        // Create a string from the vector of missing fields
+        let missing_fields_str = missing_fields.join(", ");
+
+        // Display the missing fields in the label
+        if !missing_fields.is_empty() {
+            ui.colored_label(
+                egui::Color32::LIGHT_RED,
+                format!(
+                    "Please fill the following fields and make sure they are valid: {}",
+                    missing_fields_str
+                ),
+            );
+        } else if ui.button("Prepare NYM Transaction").clicked() {
+            if let Some(ledger) = ledgers {
+                let wallet_ref = wallet.as_ref().unwrap();
+                let role = match nym_role {
+                    MyRoles::Author => UpdateRole::Reset,
+                    MyRoles::Endorser => UpdateRole::Set(LedgerRole::Endorser),
+                    MyRoles::NetworkMonitor => UpdateRole::Set(LedgerRole::NetworkMonitor),
+                    MyRoles::Steward => UpdateRole::Set(LedgerRole::Steward),
+                    MyRoles::Trustee => UpdateRole::Set(LedgerRole::Trustee),
+                };
+
+                match block_on(ledger.publish_nym(
+                    wallet_ref,
+                    &wallet_ref.did,
+                    nym_info,
+                    role,
+                    transaction_options,
+                )) {
+                    Ok(result) => {
+                        // Store only the raw transaction JSON in txn_result
+                        *txn_result = result;
+
+                        // Display additional context in the UI only
+                        ui.label(if transaction_options.send {
+                            "Transaction submitted successfully:"
+                        } else if transaction_options.sign {
+                            "Signed transaction (not submitted):"
+                        } else {
+                            "Unsigned transaction:"
+                        });
+
+                        // Display the formatted transaction
+                        ui.monospace(&*txn_result);
+
+                        if transaction_options.send {
+                            nym_info.did.clear();
+                            nym_info.verkey.clear();
+                        }
+                    }
+                    Err(e) => {
+                        *txn_result = format!("Error: {}", e);
+                    }
+                }
+            }
+        }
+    } else if *publish_option == PublishEntities::Node.to_string() {
+        ui.vertical(|ui| {
+            ui.heading("Node Registration");
+            ui.colored_label(
+                egui::Color32::from_rgb(144, 238, 144),
+                "Enter the node registration details",
+            );
+            
+            // Target DID (Node owner)
+            ui.horizontal(|ui| {
+                ui.label("Target DID:");
+                ui.add(
+                    egui::TextEdit::singleline(&mut node_info.target_did)
+                        .hint_text("DID of the node owner")
+                        .desired_width(300.0),
+                );
+            });
+            
+            // Node IP and Port
+            ui.horizontal(|ui| {
+                ui.label("Node IP:");
+                ui.add(
+                    egui::TextEdit::singleline(&mut node_info.node_ip)
+                        .hint_text("Node IP Address")
+                        .desired_width(150.0),
+                );
+                
+                ui.label("Node Port:");
+                ui.add(
+                    egui::TextEdit::singleline(&mut node_info.node_port)
+                        .hint_text("Node Port Number")
+                        .desired_width(80.0),
+                );
+            });
+            
+            // Client IP and Port
+            ui.horizontal(|ui| {
+                ui.label("Client IP:");
+                ui.add(
+                    egui::TextEdit::singleline(&mut node_info.client_ip)
+                        .hint_text("Client IP Address")
+                        .desired_width(150.0),
+                );
+                
+                ui.label("Client Port:");
+                ui.add(
+                    egui::TextEdit::singleline(&mut node_info.client_port)
+                        .hint_text("Client Port Number")
+                        .desired_width(80.0),
+                );
+            });
+            
+            // Node Alias
+            ui.horizontal(|ui| {
+                ui.label("Node Alias:");
+                ui.add(
+                    egui::TextEdit::singleline(&mut node_info.alias)
+                        .hint_text("Node Alias")
+                        .desired_width(200.0),
+                );
+            });
+            
+            // BLS Key
+            ui.horizontal(|ui| {
+                ui.label("BLS Key:");
+                ui.add(
+                    egui::TextEdit::singleline(&mut node_info.blskey)
+                        .hint_text("BLS Key")
+                        .desired_width(400.0),
+                );
+            });
+            
+            // BLS Key Proof of Possession
+            ui.horizontal(|ui| {
+                ui.label("BLS Key POP:");
+                ui.add(
+                    egui::TextEdit::singleline(&mut node_info.blskey_pop)
+                        .hint_text("BLS Key Proof of Possession")
+                        .desired_width(400.0),
+                );
+            });
+            
+            // Services
+            ui.horizontal(|ui| {
+                ui.label("Services:");
+                ui.checkbox(&mut node_info.is_validator, "VALIDATOR");
+            });
+        });
+    
+        // Check each field and add the name of the missing fields to a vector
+        let mut missing_fields = Vec::new();
+        if node_info.target_did.is_empty() {
+            missing_fields.push("Target DID");
+        }
+        if node_info.node_ip.is_empty() {
+            missing_fields.push("Node IP");
+        }
+        if node_info.node_port.is_empty() || node_info.node_port.parse::<i32>().is_err() {
+            missing_fields.push("Node Port (must be a valid number)");
+        }
+        if node_info.client_ip.is_empty() {
+            missing_fields.push("Client IP");
+        }
+        if node_info.client_port.is_empty() || node_info.client_port.parse::<i32>().is_err() {
+            missing_fields.push("Client Port (must be a valid number)");
+        }
+        if node_info.alias.is_empty() {
+            missing_fields.push("Node Alias");
+        }
+        if node_info.blskey.is_empty() {
+            missing_fields.push("BLS Key");
+        }
+        if node_info.blskey_pop.is_empty() {
+            missing_fields.push("BLS Key POP");
+        }
+    
+        // Create a string from the vector of missing fields
+        let missing_fields_str = missing_fields.join(", ");
+    
+        // Display the missing fields in the label
+        if !missing_fields.is_empty() {
+            ui.colored_label(
+                egui::Color32::LIGHT_RED,
+                format!(
+                    "Please fill the following fields: {}",
+                    missing_fields_str
+                ),
+            );
+        } else if ui.button("Prepare Node Transaction").clicked() {
+            if let Some(ledger) = ledgers {
+                let wallet_ref = wallet.as_ref().unwrap();
+                
+                // Create the services vector based on checkbox
+                let services = if node_info.is_validator {
+                    Some(vec![Services::VALIDATOR])
+                } else {
+                    Some(vec![Services::OBSERVER])
+                };
+                
+                // Create the NodeOperationData
+                let node_data = NodeOperationData {
+                    node_ip: Some(node_info.node_ip.clone()),
+                    node_port: Some(node_info.node_port.parse::<i32>().unwrap()),
+                    client_ip: Some(node_info.client_ip.clone()),
+                    client_port: Some(node_info.client_port.parse::<i32>().unwrap()),
+                    alias: node_info.alias.clone(),
+                    services,
+                    blskey: Some(node_info.blskey.clone()),
+                    blskey_pop: Some(node_info.blskey_pop.clone()),
+                };
+                
+                // Validate the NodeOperationData
+                match node_data.validate() {
+                    Ok(_) => {
+                        match block_on(ledger.publish_node(
+                            wallet_ref,
+                            &wallet_ref.did,
+                            &node_info.target_did,
+                            node_data,
+                            transaction_options,
+                        )) {
+                            Ok(result) => {
+                                // Store only the raw transaction JSON
+                                *txn_result = result;
+    
+                                // Display additional context in the UI only
+                                ui.label(if transaction_options.send {
+                                    "Node registration transaction submitted successfully:"
+                                } else if transaction_options.sign {
+                                    "Signed node registration transaction (not submitted):"
+                                } else {
+                                    "Unsigned node registration transaction:"
+                                });
+    
+                                // Display the formatted transaction
+                                ui.monospace(&*txn_result);
+                            }
+                            Err(e) => {
+                                *txn_result = format!("Error: {}", e);
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        *txn_result = format!("Invalid node data: {}", e);
+                    }
+                }
+            }
+        }
+    }
+    // Add copy button for the transaction result
+    ui.separator();
+    // Clone once at the start before any usage
+
+    if !txn_result.is_empty() {
+        ui.separator();
+        if !txn_result.starts_with("Error:") {
+            let status_message = match publish_option.as_str() {
+                "Nym" => {
+                    if transaction_options.send {
+                        "NYM transaction submitted successfully:"
+                    } else if transaction_options.sign {
+                        "Signed NYM transaction (not submitted):"
+                    } else {
+                        "Prepared NYM transaction (unsigned):"
+                    }
+                }
+                "Schema" => {
+                    if transaction_options.send {
+                        "Schema transaction submitted successfully:"
+                    } else if transaction_options.sign {
+                        "Signed schema transaction (not submitted):"
+                    } else {
+                        "Prepared schema transaction (unsigned):"
+                    }
+                }
+                "Node" => {
+                if transaction_options.send {
+                    "Node registration transaction submitted successfully:"
+                } else if transaction_options.sign {
+                    "Signed node registration transaction (not submitted):"
+                } else {
+                    "Prepared node registration transaction (unsigned):"
+                }
+            }
+                "Custom" => {
+                    if transaction_options.send {
+                        "Transaction submitted successfully:"
+                    } else if transaction_options.sign {
+                        "Signed transaction (not submitted):"
+                    } else {
+                        "Prepared transaction (unsigned):"
+                    }
+                }
+                _ => "Transaction result:",
+            };
+
+            ui.label(status_message);
+            ui.monospace(&*txn_result);
+
+            if ui.button("📋 Copy Transaction").clicked() {
+                ui.output_mut(|o| o.copied_text = txn_result.clone());
+            }
+        } else {
+            ui.colored_label(egui::Color32::RED, &*txn_result);
+        }
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::app::MyRoles;
+    use indy_vdr::ledger::{constants, RequestBuilder};
+    use indy_vdr::pool::ProtocolVersion;
+
+    #[test]
+    fn test_author_role_mapping() -> anyhow::Result<()> {
+        let role = match MyRoles::Author {
+            MyRoles::Author => UpdateRole::Reset,
+            _ => panic!("Wrong role mapping"),
+        };
+        assert_eq!(role, UpdateRole::Reset);
+
+        let request_builder = RequestBuilder::new(ProtocolVersion::default());
+        let submitter_did = DidValue("V4SGRU86Z58d6TV7PBUe6f".to_string());
+        let target_did = DidValue("7RR5ZhPkxRnNFsV6uhNDfq".to_string());
+
+        let request = request_builder.build_nym_request(
+            &submitter_did,
+            &target_did,
+            None, // no verkey
+            None, // no alias
+            Some(UpdateRole::Reset),
+            None,
+            None,
+        )?;
+
+        let request_json: serde_json::Value = serde_json::from_str(&request.req_json.to_string())?;
+
+        // Test the role specifically
+        assert_eq!(
+            request_json["operation"]["role"],
+            serde_json::Value::Null,
+            "Role should be null for Author"
+        );
+
+        // Test the complete operation matches expected format
+        let operation = &request_json["operation"];
+        assert_eq!(
+            operation["type"],
+            constants::NYM,
+            "Transaction type should be NYM"
+        );
+        assert_eq!(
+            operation["dest"],
+            target_did.to_string(),
+            "Destination DID should match"
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_transaction_options_default() {
+        let options = TransactionOptions::default();
+        assert!(options.sign, "Sign should be true by default");
+        assert!(options.send, "Send should be true by default");
+    }
+
+    #[test]
+    fn test_publish_entities_display() {
+        assert_eq!(PublishEntities::Nym.to_string(), "Nym");
+        assert_eq!(PublishEntities::Schema.to_string(), "Schema");
+        assert_eq!(PublishEntities::Custom.to_string(), "Custom");
+        assert_eq!(PublishEntities::CredDef.to_string(), "CredDef");
+        assert_eq!(PublishEntities::Attrib.to_string(), "Attrib");
+    }
+
+    #[test]
+    fn test_publish_entities_equality() {
+        assert_eq!(PublishEntities::Nym, PublishEntities::Nym);
+        assert_ne!(PublishEntities::Nym, PublishEntities::Schema);
+        assert_ne!(PublishEntities::Schema, PublishEntities::Custom);
+    }
+
+    #[test]
+    fn test_role_mappings() {
+        assert!(matches!(
+            match MyRoles::Author {
+                MyRoles::Author => UpdateRole::Reset,
+                _ => panic!("Wrong mapping"),
+            },
+            UpdateRole::Reset
+        ));
+
+        assert!(matches!(
+            match MyRoles::Endorser {
+                MyRoles::Endorser => UpdateRole::Set(LedgerRole::Endorser),
+                _ => panic!("Wrong mapping"),
+            },
+            UpdateRole::Set(LedgerRole::Endorser)
+        ));
+
+        assert!(matches!(
+            match MyRoles::NetworkMonitor {
+                MyRoles::NetworkMonitor => UpdateRole::Set(LedgerRole::NetworkMonitor),
+                _ => panic!("Wrong mapping"),
+            },
+            UpdateRole::Set(LedgerRole::NetworkMonitor)
+        ));
+
+        assert!(matches!(
+            match MyRoles::Steward {
+                MyRoles::Steward => UpdateRole::Set(LedgerRole::Steward),
+                _ => panic!("Wrong mapping"),
+            },
+            UpdateRole::Set(LedgerRole::Steward)
+        ));
+
+        assert!(matches!(
+            match MyRoles::Trustee {
+                MyRoles::Trustee => UpdateRole::Set(LedgerRole::Trustee),
+                _ => panic!("Wrong mapping"),
+            },
+            UpdateRole::Set(LedgerRole::Trustee)
+        ));
+    }
+}
+
+================
+File: src/wallet_tool.rs
+================
+use crate::app::DIDVersion;
+use crate::helpers::genesis::GenesisSource;
+use crate::helpers::wallet::IndyWallet;
+use egui::{Button, TextEdit, Ui};
+use futures_executor::block_on;
+use rfd::FileDialog;
+use serde::{Deserialize, Serialize};
+use std::collections::VecDeque;
+
+#[derive(Debug, Serialize, Deserialize, Default)]
+pub struct RecentUrls {
+    urls: VecDeque<String>,
+    max_urls: usize,
+}
+
+impl RecentUrls {
+    pub fn new(max_urls: usize) -> Self {
+        Self {
+            urls: VecDeque::with_capacity(max_urls),
+            max_urls,
+        }
+    }
+
+    pub fn add(&mut self, url: String) {
+        // Remove if already exists to avoid duplicates
+        if let Some(pos) = self.urls.iter().position(|x| x == &url) {
+            self.urls.remove(pos);
+        }
+
+        // Add to front of queue
+        self.urls.push_front(url);
+
+        // Remove oldest if over capacity
+        while self.urls.len() > self.max_urls {
+            self.urls.pop_back();
+        }
+    }
+
+    pub fn get_recent(&self) -> impl Iterator<Item = &String> {
+        self.urls.iter()
+    }
+
+    pub fn clear(&mut self) {
+        self.urls.clear();
+    }
+    pub fn is_empty(&self) -> bool {
+        self.urls.is_empty()
+    }
+}
+
+pub fn create_wallet_ui(
+    ui: &mut Ui,
+    seed: &mut String,
+    wallet: &mut Option<IndyWallet>,
+    genesis_source: &mut Option<GenesisSource>,
+    did_version: &mut DIDVersion,
+    genesis_url_input: &mut String,
+    recent_urls: &mut RecentUrls,
+) -> anyhow::Result<()> {
+    // Wallet Creation Section
+    ui.colored_label(
+        egui::Color32::from_rgb(144, 238, 144),
+        "Create a new wallet",
+    );
+
+    ui.add(
+        TextEdit::singleline(seed)
+            .char_limit(32)
+            .hint_text("Enter 32 bytes seed"),
+    );
+    ui.label(format!("Length: {}", seed.len()));
+
+    ui.colored_label(
+        egui::Color32::from_rgb(144, 238, 144),
+        "Select the version for the DID.  did:Sov is 1, did:Indy is 2",
+    );
+
+    egui::ComboBox::from_id_source("did_dropdown")
+        .selected_text(format!("{:?}", did_version))
+        .show_ui(ui, |ui| {
+            ui.selectable_value(&mut *did_version, DIDVersion::Sov, "SOV");
+            ui.selectable_value(&mut *did_version, DIDVersion::Indy, "Indy");
+        });
+
+    if ui.add(Button::new("Create Wallet")).clicked() && seed.len() == 32 {
+        let seed = seed.clone();
+        let did_version_value = match did_version {
+            DIDVersion::Sov => 1,
+            DIDVersion::Indy => 2,
+        };
+        match block_on(IndyWallet::new(Some(&seed), did_version_value)) {
+            Ok(new_wallet) => {
+                *wallet = Some(new_wallet);
+            }
+            Err(e) => {
+                ui.colored_label(
+                    egui::Color32::RED,
+                    format!("Failed to create wallet: {}", e),
+                );
+            }
+        }
+    }
+
+    if let Some(wallet) = wallet {
+        ui.label(format!(
+            "Wallet created with DID: {} and Verkey: {}",
+            wallet.did, wallet.verkey
+        ));
+    }
+
+    ui.add_space(10.0);
+    ui.separator();
+    ui.add_space(10.0);
+
+    // Genesis Source Section
+    ui.colored_label(
+        egui::Color32::from_rgb(135, 206, 250),
+        "The genesis file is required to publish something on a ledger",
+    );
+    ui.add_space(8.0);
+
+    // Option 1: Local File
+    ui.horizontal(|ui| {
+        ui.colored_label(egui::Color32::from_rgb(144, 238, 144), "Option 1:");
+        if ui.button("Select Local Genesis File").clicked() {
+            if let Some(path) = FileDialog::new().pick_file() {
+                *genesis_source = GenesisSource::from_str(&path.display().to_string()).ok();
+            }
+        }
+    });
+
+    ui.add_space(8.0);
+
+    // Option 2: URL
+    ui.colored_label(
+        egui::Color32::from_rgb(144, 238, 144),
+        "Option 2: Use a genesis URL",
+    );
+
+    let recent_urls_text = if recent_urls.is_empty() {
+        "No recent URLs"
+    } else {
+        "Select from recent URLs"
+    };
+
+    // Recent URLs dropdown
+    egui::ComboBox::from_id_source("recent_urls")
+        .selected_text(recent_urls_text)
+        .width(500.0)
+        .show_ui(ui, |ui| {
+            for url in recent_urls.get_recent() {
+                if ui
+                    .selectable_value(genesis_url_input, url.clone(), url)
+                    .clicked()
+                {
+                    if let Ok(source) = GenesisSource::from_str(genesis_url_input) {
+                        *genesis_source = Some(source);
+                    }
+                }
+            }
+        });
+
+    ui.horizontal(|ui| {
+        let response = ui.add(
+            TextEdit::singleline(genesis_url_input)
+                .hint_text("https://example.com/genesis.txt")
+                .desired_width(500.0)
+                .min_size(egui::vec2(500.0, 0.0)),
+        );
+
+        let submit_clicked = ui.button("Load URL").clicked();
+        let enter_pressed = response.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter));
+
+        if (submit_clicked || enter_pressed) && !genesis_url_input.is_empty() {
+            match GenesisSource::from_str(genesis_url_input) {
+                Ok(source) => {
+                    recent_urls.add(genesis_url_input.clone());
+                    *genesis_source = Some(source);
+                    ui.memory_mut(|mem| mem.close_popup());
+                }
+                Err(e) => {
+                    ui.colored_label(egui::Color32::RED, format!("Invalid URL: {}", e));
+                }
+            }
+        }
+    });
+
+    // Only show clear history if we have URLs
+    if !recent_urls.is_empty() {
+        ui.horizontal(|ui| {
+            if ui.small_button("🗑 Clear History").clicked() {
+                recent_urls.clear();
+            }
+            ui.small("Remove all saved URLs");
+        });
+    }
+
+    // Show current genesis source status
+    if let Some(source) = genesis_source {
+        ui.add_space(5.0);
+        ui.separator();
+        ui.horizontal(|ui| {
+            ui.label("Active genesis source:");
+            match source {
+                GenesisSource::LocalFile(path) => {
+                    ui.colored_label(egui::Color32::GREEN, format!("📁 Local file: {}", path));
+                }
+                GenesisSource::Url(url) => {
+                    ui.colored_label(egui::Color32::GREEN, format!("🌐 URL: {}", url));
+                }
+            }
+        });
+    }
+
+    // Helper text at the bottom with enhanced visibility
+    ui.add_space(10.0);
+    ui.separator();
+    ui.add_space(10.0);
+
+    // Using horizontal layout for the tip icon and text
+    ui.horizontal(|ui| {
+        // Add a tip icon
+        ui.label("💡");
+
+        // Use colored label with larger text
+        ui.colored_label(
+            egui::Color32::from_rgb(130, 190, 255),
+            egui::RichText::new(
+                "Tip: Press Enter or click 'Load URL' to load genesis file from URL",
+            )
+            .size(16.0) // Larger text size
+            .strong(), // Make it bold
+        );
+    });
+    ui.add_space(10.0); // Add some space after the tip
+
+    Ok(())
+}
+
+================
+File: .gitignore
+================
+# trunk output folder
+dist
+
+# Rust compile target directories:
+debug/
+target/
+target_ra
+target_wasm
+
+# https://github.com/lycheeverse/lychee
+.lycheecache
+.idea
+
+# just in case...
+*pool_transactions*
+
+# eframe storage directories
+.local/share/indyforge/
+%APPDATA%/indyforge/
+Library/Application Support/indyforge/
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+
+# Development files
+*.log
+
+================
+File: .typos.toml
+================
+# https://github.com/crate-ci/typos
+# install:  cargo install typos-cli
+# run:      typos
+
+[default.extend-words]
+egui = "egui" # Example for how to ignore a false positive
+
+================
+File: Cargo.toml
+================
+[package]
+name = "indyforge"
+version = "0.10.0"
+authors = ["Sylvain Martel <sylvain.martel10@mcn.gouv.qc.ca>"]
+edition = "2021"
+include = ["LICENSE-APACHE", "LICENSE-MIT", "**/*.rs", "Cargo.toml"]
+rust-version = "1.80.1"
+
+[package.metadata.docs.rs]
+all-features = true
+targets = ["x86_64-unknown-linux-gnu", "wasm32-unknown-unknown"]
+
+[dependencies]
+futures-executor = "0.3.30"
+egui = "0.27.0"
+eframe = { version = "0.27.0", default-features = false, features = [
+    # "accesskit", # Make egui comptaible with screen readers. NOTE: adds a lot of dependencies.
+    "default_fonts", # Embed the default egui fonts.
+    "glow", # Use the glow rendering backend. Alternative: "wgpu".
+    "persistence", # Enable restoring app state when restarting the app.
+] }
+log = "0.4"
+rfd = "0.14"
+# You only need serde if you want app persistence:
+serde = { version = "1", features = ["derive"] }
+anyhow = "1.0"
+serde_json = "1.0"
+tokio = { version = "1", features = ["full"] }
+derive_more = "0.99"
+reqwest = { version = "0.12", features = ["json"] }
+
+
+# Indy
+indy-data-types = "0.7.1"
+indy-vdr = { git = "https://github.com/SylvainMartel/indy-vdr.git" }
+getrandom = { version = "0.2", features = ["js"] }
+
+# Wallet
+aries-askar = "0.3"
+bs58 = "0.5"
+sha2 = "0.10"
+
+# native:
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+env_logger = "0.11"
+
+# web:
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen-futures = "0.4"
+
+
+
+
+[profile.release]
+opt-level = 2 # fast and small wasm
+
+# Optimize all dependencies even in debug builds:
+[profile.dev.package."*"]
+opt-level = 2
+
+
+[patch.crates-io]
+
+# If you want to use the bleeding edge version of egui and eframe:
+# egui = { git = "https://github.com/emilk/egui", branch = "master" }
+# eframe = { git = "https://github.com/emilk/egui", branch = "master" }
+
+# If you fork https://github.com/emilk/egui you can test with:
+# egui = { path = "../egui/crates/egui" }
+# eframe = { path = "../egui/crates/eframe" }
+
+================
+File: CHANGELOG.md
+================
+# Changelog
+
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [0.10.0] - 2024-11-13
+
+### Added
+
+- Interactive workflow guide feature
+    - Step-by-step guided workflow for users
+    - Real-time status indicators (completed/current/pending)
+
+## [0.9.0] - 2024-11-12
+
+### Added
+
+- Genesis URL history feature
+    - Persistent storage of recently used genesis URLs
+    - Quick selection from dropdown menu
+    - Maximum of 10 most recent URLs stored
+    - URLs persist between application sessions
+    - Option to clear URL history
+- Genesis file input improvements
+    - Clear option choice between local file and URL input
+    - Wider URL input field (500px) to accommodate long URLs
+    - Visual feedback for active genesis source
+
+## [0.8.0] - 2024-11-12
+
+### Added
+
+- New transaction preparation workflows
+    - Option to prepare transactions without signing
+    - Option to sign without submitting to ledger
+    - Visual indicators for transaction preparation state
+    - Transaction status feedback based on preparation options
+- Enhanced documentation
+    - New Wallet Tool user guide
+    - Publishing Tool documentation
+    - Usage instructions and best practices
+    - Troubleshooting guides
+
+### Changed
+
+- Improved transaction handling system
+    - Renamed `write_signed_transaction_to_ledger` to `prepare_transaction` for clarity
+    - Added support for unsigned transaction preview
+    - Enhanced transaction preparation workflow
+- Unified transaction display system
+
+## [0.7.0] - 2024-11-12
+
+[Previous changelog content...]
+
+### Added
+
+- Transaction preparation functionality
+    - Option to prepare transactions without sending to ledger
+    - Toggle for transaction signing
+    - Toggle for transaction submission
+    - Visual indicators for transaction preparation mode
+- Enhanced transaction display
+    - Improved JSON formatting for transactions
+    - Clean transaction copying without descriptive text
+    - Separate display of transaction status and content
+    - Copy functionality for prepared transactions
+
+### Changed
+
+- Modified the transaction workflow
+    - Separated transaction preparation from submission
+    - Added explicit transaction signing step
+    - Improved transaction display formatting
+    - Enhanced error handling for transaction preparation
+- Updated UI elements
+    - Added transaction options checkboxes
+    - Improved transaction status indicators
+    - Enhanced feedback for transaction operations
+    - Better organization of transaction controls
+
+### Fixed
+
+- Transaction display issues
+    - Removed descriptive text from copied transactions
+    - Fixed JSON formatting in display and copy operations
+    - Corrected transaction status messages
+    - Resolved borrow checker issues with transaction handling
+- UI interaction improvements
+    - Fixed transaction copy functionality
+    - Improved error message display
+    - Enhanced transaction status visibility
+    - Better handling of transaction state
+
+### Security
+
+- Improved transaction handling
+    - Clear separation of unsigned and signed transactions
+    - Better visibility of transaction signing state
+    - Enhanced transaction preparation feedback
+    - Improved transaction state management
+
+## [0.6.0] - 2024-11-11
+
+[Previous changelog content...]
+
+### Added
+
+- Genesis file viewing capability
+    - Support for both local files and URLs
+    - Content preview with copy functionality
+    - Scrollable view for genesis content
+    - URL-based genesis file loading
+- Connection status monitoring and feedback
+    - Visual connection status indicators
+    - Periodic connection health checks (every 30 seconds)
+    - Detailed error messages and logging
+    - Real-time connection status updates
+- Timeout mechanisms
+    - HTTP client timeout (10 seconds)
+    - Content reading timeout (5 seconds)
+    - Overall operation timeout (15 seconds)
+    - UI-level connection timeout (20 seconds)
+    - Visual feedback for connection duration
+- Improved DID handling and cryptographic operations
+    - Implementation serves as cross-validation between indy-data-types and aries-askar libraries
+    - Validates DID:SOV and DID:INDY spec compliance across both implementations
+    - Confirms identical DID generation from same seed material
+    - Verifies cryptographic compatibility between libraries
+    - Ensures consistent verkey generation across implementations
+
+### Changed
+
+- Improved error handling
+    - Better error messages for HTTP failures (404, etc.)
+    - Clear error states with retry options
+    - Separated error display from error handling logic
+    - Added HTTP status code specific error messages
+- Enhanced connection management
+    - State tracking for genesis file changes
+    - Proper reset of connection state on errors
+    - Prevention of connection retry spam
+    - Connection state cleanup on source changes
+- UI Improvements
+    - Added genesis content viewer toggle
+    - Better error message formatting
+    - Added retry button for failed connections
+    - Added spinner during connection attempts
+    - Separated wallet and genesis file checks
+    - Progress indicators for long operations
+- Cryptographic implementation improvements
+    - Maintained reference implementation using indy-data-types
+    - Validated against aries-askar implementation
+    - Ensured cross-library compatibility
+    - Verified consistent cryptographic operations
+
+### Fixed
+
+- Fixed infinite connection retry on failed URLs
+- Fixed borrowing issues with error handling
+- Fixed connection state not resetting properly
+- Fixed error messages not displaying correctly
+- Fixed genesis file content not updating on source change
+- Fixed UI state preservation during connection attempts
+- Fixed connection timeout handling
+- Fixed error state management during retries
+- Fixed signing operations
+    - Verified consistent signing behavior across implementations
+    - Validated signature compatibility
+    - Ensured deterministic DID generation
+    - Confirmed cross-library cryptographic material compatibility
+
+### Enhanced Logging
+
+- Added debug logging for genesis file operations
+- Added connection attempt logging
+- Added error state logging
+- Added HTTP request/response logging
+- Added timeout and connection state logging
+- Added cryptographic operation logging
+    - Key derivation process logging
+    - Signing operation details
+    - DID creation steps
+    - Transaction signing verification
+
+### Security
+
+- Improved key handling
+    - Validated cryptographic implementations against specifications
+    - Verified consistent key generation across libraries
+    - Confirmed deterministic key derivation
+    - Cross-validated cryptographic operations
+
+### Code Quality
+
+- Improved architecture
+    - Maintained reference implementation for cross-validation
+    - Demonstrated spec compliance across libraries
+    - Provided compatibility verification
+    - Enhanced testing coverage through cross-implementation validation
+
+### Verification
+
+- Added cross-implementation validation
+    - Verified DID:SOV spec compliance between indy-data-types and aries-askar
+    - Confirmed DID:INDY spec compliance across implementations
+    - Validated consistent verkey generation
+    - Demonstrated cryptographic compatibility
+    - Ensured deterministic output from identical inputs
+
+================
+File: check.sh
+================
+#!/usr/bin/env bash
+# This scripts runs various CI-like checks in a convenient way.
+set -eux
+
+cargo check --quiet --workspace --all-targets
+cargo check --quiet --workspace --all-features --lib --target wasm32-unknown-unknown
+cargo fmt --all -- --check
+cargo clippy --quiet --workspace --all-targets --all-features --  -D warnings -W clippy::all
+cargo test --quiet --workspace --all-targets --all-features
+cargo test --quiet --workspace --doc
+trunk build
+
+================
+File: index.html
+================
+<!DOCTYPE html>
+<html>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+
+<!-- Disable zooming: -->
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+
+<head>
+    <!-- change this to your project name -->
+    <title>Indorser</title>
+
+    <!-- config for our rust wasm binary. go to https://trunkrs.dev/assets/#rust for more customization -->
+    <link data-trunk rel="rust" data-wasm-opt="2"/>
+    <!-- this is the base _url relative to which other urls will be constructed. trunk will insert this from the public-_url option -->
+    <base data-trunk-public-_url/>
+
+    <link data-trunk rel="icon" href="assets/favicon.ico">
+
+
+    <link data-trunk rel="copy-file" href="assets/sw.js"/>
+    <link data-trunk rel="copy-file" href="assets/manifest.json"/>
+    <link data-trunk rel="copy-file" href="assets/icon-1024.png"/>
+    <link data-trunk rel="copy-file" href="assets/icon-256.png"/>
+    <link data-trunk rel="copy-file" href="assets/icon_ios_touch_192.png"/>
+    <link data-trunk rel="copy-file" href="assets/maskable_icon_x512.png"/>
+
+
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icon_ios_touch_192.png">
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="white">
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#404040">
+
+    <style>
+        html {
+            /* Remove touch delay: */
+            touch-action: manipulation;
+        }
+
+        body {
+            /* Light mode background color for what is not covered by the egui canvas,
+            or where the egui canvas is translucent. */
+            background: #909090;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            body {
+                /* Dark mode background color for what is not covered by the egui canvas,
+                or where the egui canvas is translucent. */
+                background: #404040;
+            }
+        }
+
+        /* Allow canvas to fill entire web page: */
+        html,
+        body {
+            overflow: hidden;
+            margin: 0 !important;
+            padding: 0 !important;
+            height: 100%;
+            width: 100%;
+        }
+
+        /* Position canvas in center-top: */
+        canvas {
+            margin-right: auto;
+            margin-left: auto;
+            display: block;
+            position: absolute;
+            top: 0%;
+            left: 50%;
+            transform: translate(-50%, 0%);
+        }
+
+        .centered {
+            margin-right: auto;
+            margin-left: auto;
+            display: block;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #f0f0f0;
+            font-size: 24px;
+            font-family: Ubuntu-Light, Helvetica, sans-serif;
+            text-align: center;
+        }
+
+        /* ---------------------------------------------- */
+        /* Loading animation from https://loading.io/css/ */
+        .lds-dual-ring {
+            display: inline-block;
+            width: 24px;
+            height: 24px;
+        }
+
+        .lds-dual-ring:after {
+            content: " ";
+            display: block;
+            width: 24px;
+            height: 24px;
+            margin: 0px;
+            border-radius: 50%;
+            border: 3px solid #fff;
+            border-color: #fff transparent #fff transparent;
+            animation: lds-dual-ring 1.2s linear infinite;
+        }
+
+        @keyframes lds-dual-ring {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+    </style>
+</head>
+
+<body>
+<!-- The WASM code will resize the canvas dynamically -->
+<!-- the id is hardcoded in main.rs . so, make sure both match. -->
+<canvas id="the_canvas_id"></canvas>
+
+<!--Register Service Worker. this will cache the wasm / js scripts for offline use (for PWA functionality). -->
+<!-- Force refresh (Ctrl + F5) to load the latest files instead of cached files  -->
+<script>
+    // We disable caching during development so that we always view the latest version.
+    if ('serviceWorker' in navigator && window.location.hash !== "#dev") {
+        window.addEventListener('load', function () {
+            navigator.serviceWorker.register('sw.js');
+        });
+    }
+</script>
+</body>
+
+</html>
+
+<!-- Powered by egui: https://github.com/emilk/egui/ -->
+
+================
+File: LICENSE-APACHE
+================
+Apache License
+                        Version 2.0, January 2004
+                     http://www.apache.org/licenses/
+
+TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION
+
+1. Definitions.
+
+   "License" shall mean the terms and conditions for use, reproduction,
+   and distribution as defined by Sections 1 through 9 of this document.
+
+   "Licensor" shall mean the copyright owner or entity authorized by
+   the copyright owner that is granting the License.
+
+   "Legal Entity" shall mean the union of the acting entity and all
+   other entities that control, are controlled by, or are under common
+   control with that entity. For the purposes of this definition,
+   "control" means (i) the power, direct or indirect, to cause the
+   direction or management of such entity, whether by contract or
+   otherwise, or (ii) ownership of fifty percent (50%) or more of the
+   outstanding shares, or (iii) beneficial ownership of such entity.
+
+   "You" (or "Your") shall mean an individual or Legal Entity
+   exercising permissions granted by this License.
+
+   "Source" form shall mean the preferred form for making modifications,
+   including but not limited to software source code, documentation
+   source, and configuration files.
+
+   "Object" form shall mean any form resulting from mechanical
+   transformation or translation of a Source form, including but
+   not limited to compiled object code, generated documentation,
+   and conversions to other media types.
+
+   "Work" shall mean the work of authorship, whether in Source or
+   Object form, made available under the License, as indicated by a
+   copyright notice that is included in or attached to the work
+   (an example is provided in the Appendix below).
+
+   "Derivative Works" shall mean any work, whether in Source or Object
+   form, that is based on (or derived from) the Work and for which the
+   editorial revisions, annotations, elaborations, or other modifications
+   represent, as a whole, an original work of authorship. For the purposes
+   of this License, Derivative Works shall not include works that remain
+   separable from, or merely link (or bind by name) to the interfaces of,
+   the Work and Derivative Works thereof.
+
+   "Contribution" shall mean any work of authorship, including
+   the original version of the Work and any modifications or additions
+   to that Work or Derivative Works thereof, that is intentionally
+   submitted to Licensor for inclusion in the Work by the copyright owner
+   or by an individual or Legal Entity authorized to submit on behalf of
+   the copyright owner. For the purposes of this definition, "submitted"
+   means any form of electronic, verbal, or written communication sent
+   to the Licensor or its representatives, including but not limited to
+   communication on electronic mailing lists, source code control systems,
+   and issue tracking systems that are managed by, or on behalf of, the
+   Licensor for the purpose of discussing and improving the Work, but
+   excluding communication that is conspicuously marked or otherwise
+   designated in writing by the copyright owner as "Not a Contribution."
+
+   "Contributor" shall mean Licensor and any individual or Legal Entity
+   on behalf of whom a Contribution has been received by Licensor and
+   subsequently incorporated within the Work.
+
+2. Grant of Copyright License. Subject to the terms and conditions of
+   this License, each Contributor hereby grants to You a perpetual,
+   worldwide, non-exclusive, no-charge, royalty-free, irrevocable
+   copyright license to reproduce, prepare Derivative Works of,
+   publicly display, publicly perform, sublicense, and distribute the
+   Work and such Derivative Works in Source or Object form.
+
+3. Grant of Patent License. Subject to the terms and conditions of
+   this License, each Contributor hereby grants to You a perpetual,
+   worldwide, non-exclusive, no-charge, royalty-free, irrevocable
+   (except as stated in this section) patent license to make, have made,
+   use, offer to sell, sell, import, and otherwise transfer the Work,
+   where such license applies only to those patent claims licensable
+   by such Contributor that are necessarily infringed by their
+   Contribution(s) alone or by combination of their Contribution(s)
+   with the Work to which such Contribution(s) was submitted. If You
+   institute patent litigation against any entity (including a
+   cross-claim or counterclaim in a lawsuit) alleging that the Work
+   or a Contribution incorporated within the Work constitutes direct
+   or contributory patent infringement, then any patent licenses
+   granted to You under this License for that Work shall terminate
+   as of the date such litigation is filed.
+
+4. Redistribution. You may reproduce and distribute copies of the
+   Work or Derivative Works thereof in any medium, with or without
+   modifications, and in Source or Object form, provided that You
+   meet the following conditions:
+
+   (a) You must give any other recipients of the Work or
+       Derivative Works a copy of this License; and
+
+   (b) You must cause any modified files to carry prominent notices
+       stating that You changed the files; and
+
+   (c) You must retain, in the Source form of any Derivative Works
+       that You distribute, all copyright, patent, trademark, and
+       attribution notices from the Source form of the Work,
+       excluding those notices that do not pertain to any part of
+       the Derivative Works; and
+
+   (d) If the Work includes a "NOTICE" text file as part of its
+       distribution, then any Derivative Works that You distribute must
+       include a readable copy of the attribution notices contained
+       within such NOTICE file, excluding those notices that do not
+       pertain to any part of the Derivative Works, in at least one
+       of the following places: within a NOTICE text file distributed
+       as part of the Derivative Works; within the Source form or
+       documentation, if provided along with the Derivative Works; or,
+       within a display generated by the Derivative Works, if and
+       wherever such third-party notices normally appear. The contents
+       of the NOTICE file are for informational purposes only and
+       do not modify the License. You may add Your own attribution
+       notices within Derivative Works that You distribute, alongside
+       or as an addendum to the NOTICE text from the Work, provided
+       that such additional attribution notices cannot be construed
+       as modifying the License.
+
+   You may add Your own copyright statement to Your modifications and
+   may provide additional or different license terms and conditions
+   for use, reproduction, or distribution of Your modifications, or
+   for any such Derivative Works as a whole, provided Your use,
+   reproduction, and distribution of the Work otherwise complies with
+   the conditions stated in this License.
+
+5. Submission of Contributions. Unless You explicitly state otherwise,
+   any Contribution intentionally submitted for inclusion in the Work
+   by You to the Licensor shall be under the terms and conditions of
+   this License, without any additional terms or conditions.
+   Notwithstanding the above, nothing herein shall supersede or modify
+   the terms of any separate license agreement you may have executed
+   with Licensor regarding such Contributions.
+
+6. Trademarks. This License does not grant permission to use the trade
+   names, trademarks, service marks, or product names of the Licensor,
+   except as required for reasonable and customary use in describing the
+   origin of the Work and reproducing the content of the NOTICE file.
+
+7. Disclaimer of Warranty. Unless required by applicable law or
+   agreed to in writing, Licensor provides the Work (and each
+   Contributor provides its Contributions) on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+   implied, including, without limitation, any warranties or conditions
+   of TITLE, NON-INFRINGEMENT, MERCHANTABILITY, or FITNESS FOR A
+   PARTICULAR PURPOSE. You are solely responsible for determining the
+   appropriateness of using or redistributing the Work and assume any
+   risks associated with Your exercise of permissions under this License.
+
+8. Limitation of Liability. In no event and under no legal theory,
+   whether in tort (including negligence), contract, or otherwise,
+   unless required by applicable law (such as deliberate and grossly
+   negligent acts) or agreed to in writing, shall any Contributor be
+   liable to You for damages, including any direct, indirect, special,
+   incidental, or consequential damages of any character arising as a
+   result of this License or out of the use or inability to use the
+   Work (including but not limited to damages for loss of goodwill,
+   work stoppage, computer failure or malfunction, or any and all
+   other commercial damages or losses), even if such Contributor
+   has been advised of the possibility of such damages.
+
+9. Accepting Warranty or Additional Liability. While redistributing
+   the Work or Derivative Works thereof, You may choose to offer,
+   and charge a fee for, acceptance of support, warranty, indemnity,
+   or other liability obligations and/or rights consistent with this
+   License. However, in accepting such obligations, You may act only
+   on Your own behalf and on Your sole responsibility, not on behalf
+   of any other Contributor, and only if You agree to indemnify,
+   defend, and hold each Contributor harmless for any liability
+   incurred by, or claims asserted against, such Contributor by reason
+   of your accepting any such warranty or additional liability.
+
+END OF TERMS AND CONDITIONS
+
+APPENDIX: How to apply the Apache License to your work.
+
+   To apply the Apache License to your work, attach the following
+   boilerplate notice, with the fields enclosed by brackets "[]"
+   replaced with your own identifying information. (Don't include
+   the brackets!)  The text should be enclosed in the appropriate
+   comment syntax for the file format. We also recommend that a
+   file or class name and description of purpose be included on the
+   same "printed page" as the copyright notice for easier
+   identification within third-party archives.
+
+Copyright [yyyy] [name of copyright owner]
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+================
+File: LICENSE-MIT
+================
+Permission is hereby granted, free of charge, to any
+person obtaining a copy of this software and associated
+documentation files (the "Software"), to deal in the
+Software without restriction, including without
+limitation the rights to use, copy, modify, merge,
+publish, distribute, sublicense, and/or sell copies of
+the Software, and to permit persons to whom the Software
+is furnished to do so, subject to the following
+conditions:
+
+The above copyright notice and this permission notice
+shall be included in all copies or substantial portions
+of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF
+ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
+TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT
+SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
+IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+DEALINGS IN THE SOFTWARE.
+
+================
+File: README.md
+================
+[![img](https://img.shields.io/badge/Cycle%20de%20Vie-Phase%20d%C3%A9couverte-339999)]
+
+# Indy Forge
+
+[![img](https://img.shields.io/badge/Version-0.7.0-blue)](
+
+## About
+
+A graphical interface for various utilities that can be useful for Indy Ledger
+The app uses [egui](https://www.egui.rs/) for the GUI, as such you can run it natively on Windows, Linux and MacOS ~~or
+for the web, and share it using Github Pages.~~ See [issue #1](https://github.com/MCN-ING/indy-forge/issues/1)
+
+## Endorser Tool
+
+Tool for endorsing (signing) Indy Node transactions.
+
+The [endorser-tool](https://github.com/andrewwhitehead/endorser-tool) from Andrew Whitehead was the inspiration for this
+project.
+
+## Publishing Tool
+
+- Custom transaction publishing
+- Schema creation and publishing
+- NYM registration with role management
+- Genesis file management with previewing capabilities
+- Real-time connection status monitoring
+
+## Getting started
+
+Make sure you are using the latest version of stable rust by running `rustup update`.
+Run `cargo run` to start the app.
+
+### Native Locally
+
+`cargo run --release`
+The executable will be in `target/release/indyforge`
+
+On Linux you need to first run:
+
+`sudo apt-get install libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libxkbcommon-dev libssl-dev`
+
+On Fedora Rawhide you need to run:
+
+`dnf install clang clang-devel clang-tools-extra libxkbcommon-devel pkg-config openssl-devel libxcb-devel gtk3-devel atk fontconfig-devel`
+
+### Web Locally
+
+Sadly, for the moment, the zmq library is preventing a webassembly build.
+
+### DID Implementation
+
+- Supports both DID:SOV (v1) and DID:INDY (v2)
+- DID:INDY generation uses SHA256(verkey) with base58 encoding
+- Comprehensive validation of DID-verkey relationships
+- Cross-validated cryptographic operations
+
+## Local Storage
+
+IndyForge uses local storage to save user preferences and recent genesis URLs. Storage locations:
+
+- Linux: `~/.local/share/indyforge/`
+- Windows: `%APPDATA%/indyforge/`
+- macOS: `~/Library/Application Support/indyforge/`
+
+These directories are automatically created when needed. They contain user-specific data and should not be committed to
+the repository.
+
+### Developers
+
+When developing IndyForge:
+
+1. Ensure storage directories are in your .gitignore
+2. Be cautious when committing - verify no user data is included
+3. Storage is disabled during tests to prevent test data persistence
+
+## À propos
+
+Une interface graphique pour divers utilitaires qui peuvent être utiles pour Indy Ledger.
+L'application utilise [egui](https://www.egui.rs/) pour l'interface graphique, vous pouvez donc l'exécuter nativement
+sur Windows, Linux et MacOS ~~ou
+pour le web, et le partager en utilisant Github Pages.~~
+Voir [problème #1](https://github.com/MCN-ING/indy-forge/issues/1).
+
+## Outil de signature
+
+Outil pour signer des transactions de nœud Indy.
+
+L'[outil de](https://github.com/andrewwhitehead/endorser-tool) d'Andrew Whitehead a inspiré ce
+projet.
+
+## Outil de création de NYM
+
+Outil pour enregistrer un nouveau NYM et son rôle sur Indy Ledger.
+
+## Pour commencer
+
+Assurez-vous d'utiliser la dernière version de Rust stable en exécutant `rustup update`.
+Exécutez `cargo run` pour démarrer l'application.
+
+### Natif Localement
+
+`cargo run --release`
+L'exécutable se trouvera dans `target/release/indyforge`.
+
+Sur Linux, vous devez d'abord exécuter :
+
+`sudo apt-get install libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libxkbcommon-dev libssl-dev`
+
+Sur Fedora Rawhide, vous devez exécuter :
+
+`dnf install clang clang-devel clang-tools-extra libxkbcommon-devel pkg-config openssl-devel libxcb-devel gtk3-devel atk fontconfig-devel`
+
+### Web Localement
+
+Malheureusement, pour le moment, la bibliothèque zmq empêche une compilation en WebAssembly.
+
+================
+File: rust-toolchain
+================
+# If you see this, run "rustup self update" to get rustup 1.23 or newer.
+
+# NOTE: above comment is for older `rustup` (before TOML support was added),
+# which will treat the first line as the toolchain name, and therefore show it
+# to the user in the error, instead of "error: invalid channel name '[toolchain]'".
+
+[toolchain]
+channel = "1.80.1"
+components = [ "rustfmt", "clippy" ]
+targets = [ "wasm32-unknown-unknown" ]
+
+================
+File: Trunk.toml
+================
+[build]
+
+
+
+================================================================
+End of Codebase
+================================================================
