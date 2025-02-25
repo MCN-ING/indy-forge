@@ -135,6 +135,8 @@ pub struct TemplateApp {
     connection_start_time: Option<std::time::Instant>,
     transaction_options: TransactionOptions,
     recent_urls: RecentUrls,
+    show_seed: bool,
+    show_endorser_seed: bool,
 }
 
 impl Default for TemplateApp {
@@ -178,6 +180,8 @@ impl Default for TemplateApp {
             show_genesis_content: false,
             current_genesis_path: None,
             connection_start_time: None,
+            show_seed: false,
+            show_endorser_seed: false,
             transaction_options: TransactionOptions::default(),
             recent_urls: RecentUrls::new(10),
         }
@@ -269,6 +273,7 @@ impl eframe::App for TemplateApp {
                             &mut self.txn,
                             &mut self.signed_txn_result,
                             &mut self.did_version,
+                            &mut self.show_endorser_seed,
                         );
                     });
             }
@@ -284,12 +289,13 @@ impl eframe::App for TemplateApp {
                     ui.separator();
                     ui.label("Tool that create a temporary wallet and hold the DID used by the other tools");
                     create_wallet_ui(ui,
-                                     &mut self.trustee_seed,
+                                     &mut self.trustee_seed,                                     
                                      &mut self.wallet,
                                      &mut self.genesis_source,
                                      &mut self.did_version,
                                      &mut self.genesis_url_input,
-                                     &mut self.recent_urls,)
+                                     &mut self.recent_urls,
+                                     &mut self.show_seed)
                         .expect("Something went wrong with the wallet creation");
                 });
             }
