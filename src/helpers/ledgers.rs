@@ -6,7 +6,7 @@ use indy_data_types::did::DidValue;
 use indy_vdr::common::error::{VdrError, VdrErrorKind, VdrResult};
 use indy_vdr::config::PoolConfig;
 use indy_vdr::ledger::constants::UpdateRole;
-use indy_vdr::ledger::requests::node::{NodeOperation, NodeOperationData, Services};
+use indy_vdr::ledger::requests::node::NodeOperationData;
 use indy_vdr::pool::helpers::perform_ledger_request;
 use indy_vdr::pool::{LocalPool, Pool, PoolBuilder, PreparedRequest, RequestResult};
 

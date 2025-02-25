@@ -48,6 +48,7 @@ impl RecentUrls {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn create_wallet_ui(
     ui: &mut Ui,
     seed: &mut String,
