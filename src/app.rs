@@ -531,7 +531,6 @@ impl eframe::App for TemplateApp {
     // fn save(&mut self, storage: &mut dyn eframe::Storage) {
     //     eframe::set_value(storage, eframe::APP_KEY, self);
     // }
-
     fn save(&mut self, storage: &mut dyn eframe::Storage) {
         if !cfg!(test) {
             // Don't save during tests

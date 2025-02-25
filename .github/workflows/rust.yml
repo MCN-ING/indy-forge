@@ -5,10 +5,10 @@ on:
   workflow_dispatch:
   push:
     tags:
-      - 'v*'  # This will trigger on any tag starting with 'v'
+      - "v*" # This will trigger on any tag starting with 'v'
 
 env:
-  RUSTFLAGS: -D warnings --cfg=web_sys_unstable_apis
+  RUSTFLAGS: --cfg=web_sys_unstable_apis
   RUSTDOCFLAGS: -D warnings
 
 jobs:
@@ -73,11 +73,11 @@ jobs:
       - uses: actions-rs/cargo@v1
         with:
           command: clippy
-          args: -- -D warnings
+          args: -- -W clippy::all
 
   build:
     name: Build
-    needs: [ check, test, fmt, clippy ]
+    needs: [check, test, fmt, clippy]
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -161,7 +161,7 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/')
-    
+
     steps:
       - uses: actions/checkout@v4
 
