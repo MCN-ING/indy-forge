@@ -8,6 +8,7 @@ pub fn endorser_tool(
     txn: &mut String,
     signed_txn_result: &mut Option<String>,
     did_version: &mut DIDVersion,
+    show_endorser_seed: &mut bool,
 ) {
     ui.label("Sign Txn with Endorser DID");
     // Add more UI elements inside the nested window
@@ -18,8 +19,20 @@ pub fn endorser_tool(
         ui.add(
             egui::TextEdit::singleline(endorser_seed)
                 .char_limit(32)
-                .hint_text("Enter 32 bytes seed"),
+                .hint_text("Enter 32 bytes seed")
+                .password(!*show_endorser_seed),
         );
+        // Add a toggle button with eye icon
+        if ui
+            .button(if *show_endorser_seed {
+                "🙈 Hide"
+            } else {
+                "👁 Show"
+            })
+            .clicked()
+        {
+            *show_endorser_seed = !*show_endorser_seed;
+        }
         ui.label(format!("Length: {}", endorser_seed.len()));
         ui.label("Select the version for the DID.  did:Sov is 1, did:Indy is 2");
         egui::ComboBox::from_id_source("version_dropdown")

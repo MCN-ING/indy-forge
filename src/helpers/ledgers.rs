@@ -6,6 +6,7 @@ use indy_data_types::did::DidValue;
 use indy_vdr::common::error::{VdrError, VdrErrorKind, VdrResult};
 use indy_vdr::config::PoolConfig;
 use indy_vdr::ledger::constants::UpdateRole;
+use indy_vdr::ledger::requests::node::NodeOperationData;
 use indy_vdr::pool::helpers::perform_ledger_request;
 use indy_vdr::pool::{LocalPool, Pool, PoolBuilder, PreparedRequest, RequestResult};
 
@@ -268,6 +269,54 @@ impl IndyLedger {
                 }
                 Err(error)
             }
+        }
+    }
+
+    pub async fn publish_node(
+        &self,
+        wallet: &IndyWallet,
+        submitter_did: &str,
+        target_did: &str,
+        node_data: NodeOperationData,
+        options: &TransactionOptions,
+    ) -> VdrResult<String> {
+        let mut request = self.pool.get_request_builder().build_node_request(
+            &DidValue(submitter_did.to_string()),
+            &DidValue(target_did.to_string()),
+            node_data,
+        )?;
+
+        let result = if options.sign {
+            let sig_bytes = request.get_signature_input()?;
+            let signature = wallet.sign(sig_bytes.as_bytes()).await;
+            request.set_signature(&signature)?;
+            serde_json::to_string_pretty(&request.req_json).map_err(|e| {
+                VdrError::new(
+                    VdrErrorKind::Input,
+                    Some(format!(
+                        "Failed to serialize signed node transaction: {}",
+                        e
+                    )),
+                    None,
+                )
+            })?
+        } else {
+            serde_json::to_string_pretty(&request.req_json).map_err(|e| {
+                VdrError::new(
+                    VdrErrorKind::Input,
+                    Some(format!(
+                        "Failed to serialize unsigned node transaction: {}",
+                        e
+                    )),
+                    None,
+                )
+            })?
+        };
+
+        if options.send {
+            self._submit_request(&request).await
+        } else {
+            Ok(result)
         }
     }
 }

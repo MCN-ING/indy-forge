@@ -12,6 +12,35 @@ use std::time::Duration;
 use tokio::time::timeout;
 
 #[derive(PartialEq, Eq, Deserialize, Serialize, Debug)]
+pub struct NodeInfo {
+    pub target_verkey: String,
+    pub node_ip: String,
+    pub node_port: String,
+    pub client_ip: String,
+    pub client_port: String,
+    pub alias: String,
+    pub blskey: String,
+    pub blskey_pop: String,
+    pub is_validator: bool,
+}
+
+impl Default for NodeInfo {
+    fn default() -> Self {
+        Self {
+            target_verkey: "".to_owned(),
+            node_ip: "".to_owned(),
+            node_port: "9701".to_owned(),
+            client_ip: "".to_owned(),
+            client_port: "9702".to_owned(),
+            alias: "".to_owned(),
+            blskey: "".to_owned(),
+            blskey_pop: "".to_owned(),
+            is_validator: true,
+        }
+    }
+}
+
+#[derive(PartialEq, Eq, Deserialize, Serialize, Debug)]
 pub enum MyRoles {
     Author = 999,
     Endorser = 101,
@@ -98,12 +127,15 @@ pub struct TemplateApp {
     genesis_url_input: String,
     ledger_connecting: bool,
     ledger_error: Option<String>,
+    node_info: NodeInfo,
     genesis_content: Option<String>,
     show_genesis_content: bool,
     current_genesis_path: Option<String>,
     connection_start_time: Option<std::time::Instant>,
     transaction_options: TransactionOptions,
     recent_urls: RecentUrls,
+    show_seed: bool,
+    show_endorser_seed: bool,
 }
 
 impl Default for TemplateApp {
@@ -142,10 +174,13 @@ impl Default for TemplateApp {
             genesis_url_input: String::new(),
             ledger_connecting: false,
             ledger_error: None,
+            node_info: NodeInfo::default(),
             genesis_content: None,
             show_genesis_content: false,
             current_genesis_path: None,
             connection_start_time: None,
+            show_seed: false,
+            show_endorser_seed: false,
             transaction_options: TransactionOptions::default(),
             recent_urls: RecentUrls::new(10),
         }
@@ -211,7 +246,7 @@ impl eframe::App for TemplateApp {
                 ui.checkbox(&mut self.tool_visibility.show_wallet_tool, "Wallet Tool");
                 ui.checkbox(&mut self.tool_visibility.show_workflow_guide, "Guide");
                 ui.separator();
-                if ui.button("Organize windows").clicked() {
+                if ui.button("Reset Windows").clicked() {
                     ui.ctx().memory_mut(|mem| mem.reset_areas());
                 }
             });
@@ -237,6 +272,7 @@ impl eframe::App for TemplateApp {
                             &mut self.txn,
                             &mut self.signed_txn_result,
                             &mut self.did_version,
+                            &mut self.show_endorser_seed,
                         );
                     });
             }
@@ -257,7 +293,8 @@ impl eframe::App for TemplateApp {
                                      &mut self.genesis_source,
                                      &mut self.did_version,
                                      &mut self.genesis_url_input,
-                                     &mut self.recent_urls,)
+                                     &mut self.recent_urls,
+                                     &mut self.show_seed)
                         .expect("Something went wrong with the wallet creation");
                 });
             }
@@ -475,6 +512,7 @@ impl eframe::App for TemplateApp {
                                     &mut self.publish_option,
                                     &mut self.nym_role,
                                     &mut self.nym_info,
+                                    &mut self.node_info,
                                     &mut self.genesis_source,
                                     &mut self.ledgers,
                                     &mut self.txn_result,
@@ -493,7 +531,6 @@ impl eframe::App for TemplateApp {
     // fn save(&mut self, storage: &mut dyn eframe::Storage) {
     //     eframe::set_value(storage, eframe::APP_KEY, self);
     // }
-
     fn save(&mut self, storage: &mut dyn eframe::Storage) {
         if !cfg!(test) {
             // Don't save during tests

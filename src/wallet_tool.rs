@@ -48,6 +48,7 @@ impl RecentUrls {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn create_wallet_ui(
     ui: &mut Ui,
     seed: &mut String,
@@ -56,6 +57,7 @@ pub fn create_wallet_ui(
     did_version: &mut DIDVersion,
     genesis_url_input: &mut String,
     recent_urls: &mut RecentUrls,
+    show_seed: &mut bool,
 ) -> anyhow::Result<()> {
     // Wallet Creation Section
     ui.colored_label(
@@ -66,8 +68,16 @@ pub fn create_wallet_ui(
     ui.add(
         TextEdit::singleline(seed)
             .char_limit(32)
-            .hint_text("Enter 32 bytes seed"),
+            .hint_text("Enter 32 bytes seed")
+            .password(!*show_seed),
     );
+    // toggle button
+    if ui
+        .button(if *show_seed { "🙈 Hide" } else { "👁 Show" })
+        .clicked()
+    {
+        *show_seed = !*show_seed;
+    }
     ui.label(format!("Length: {}", seed.len()));
 
     ui.colored_label(

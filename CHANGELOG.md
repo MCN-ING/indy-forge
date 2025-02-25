@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.0] - 2024-11-14
+
+### Added
+
+- Node registration functionality
+  - Support for registering validator and observer nodes
+  - Complete form for node verification key, IP addresses, ports, alias, and BLS key details
+  - Validation of all node registration fields
+  - Node transaction preparation and submission
+- Updated documentation with node registration details
+- "seed" fields are now hidden, with a toggle button to hide/show
+
 ## [0.10.0] - 2024-11-13
 
 ### Added
@@ -52,8 +64,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Unified transaction display system
 
 ## [0.7.0] - 2024-11-12
-
-[Previous changelog content...]
 
 ### Added
 
@@ -103,8 +113,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - Improved transaction state management
 
 ## [0.6.0] - 2024-11-11
-
-[Previous changelog content...]
 
 ### Added
 
@@ -204,8 +212,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Verification
 
 - Added cross-implementation validation
-    - Verified DID:SOV spec compliance between indy-data-types and aries-askar
-    - Confirmed DID:INDY spec compliance across implementations
-    - Validated consistent verkey generation
-    - Demonstrated cryptographic compatibility
-    - Ensured deterministic output from identical inputs
+    - Verified DID:SOV spec com

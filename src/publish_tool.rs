@@ -1,4 +1,4 @@
-use crate::app::{MyRoles, NymInfo, SchemaInfo, TransactionOptions};
+use crate::app::{MyRoles, NodeInfo, NymInfo, SchemaInfo, TransactionOptions};
 use crate::helpers::genesis::GenesisSource;
 use crate::helpers::ledgers::IndyLedger;
 use crate::helpers::wallet::IndyWallet;
@@ -11,6 +11,7 @@ use indy_data_types::anoncreds::schema::{
 use indy_data_types::did::DidValue;
 use indy_data_types::{SchemaId, Validatable};
 use indy_vdr::ledger::constants::{LedgerRole, UpdateRole};
+use indy_vdr::ledger::requests::node::{NodeOperationData, Services};
 
 #[derive(PartialEq, Eq, Debug, Display)]
 enum PublishEntities {
@@ -18,6 +19,7 @@ enum PublishEntities {
     Nym,
     Attrib,
     Schema,
+    Node,
     Custom,
 }
 
@@ -29,6 +31,7 @@ pub fn publish_tool_ui(
     publish_option: &mut String,
     nym_role: &mut MyRoles,
     nym_info: &mut NymInfo,
+    node_info: &mut NodeInfo,
     genesis_source: &mut Option<GenesisSource>,
     ledgers: &mut Option<IndyLedger>,
     txn_result: &mut String,
@@ -43,6 +46,7 @@ pub fn publish_tool_ui(
         //PublishEntities::CredDef,
         PublishEntities::Nym,
         PublishEntities::Schema,
+        PublishEntities::Node,
         PublishEntities::Custom,
     ];
 
@@ -366,6 +370,191 @@ pub fn publish_tool_ui(
                 }
             }
         }
+    } else if *publish_option == PublishEntities::Node.to_string() {
+        ui.vertical(|ui| {
+            ui.heading("Node Registration");
+            ui.colored_label(
+                egui::Color32::from_rgb(144, 238, 144),
+                "Enter the node registration details",
+            );
+
+            // Target DID (Node owner)
+            ui.horizontal(|ui| {
+                ui.label("Target Verkey:");
+                ui.add(
+                    egui::TextEdit::singleline(&mut node_info.target_verkey)
+                        .hint_text("Verification key of the node owner")
+                        .desired_width(300.0),
+                );
+            });
+
+            // Node IP and Port
+            ui.horizontal(|ui| {
+                ui.label("Node IP:");
+                ui.add(
+                    egui::TextEdit::singleline(&mut node_info.node_ip)
+                        .hint_text("Node IP Address")
+                        .desired_width(150.0),
+                );
+
+                ui.label("Node Port:");
+                ui.add(
+                    egui::TextEdit::singleline(&mut node_info.node_port)
+                        .hint_text("Node Port Number")
+                        .desired_width(80.0),
+                );
+            });
+
+            // Client IP and Port
+            ui.horizontal(|ui| {
+                ui.label("Client IP:");
+                ui.add(
+                    egui::TextEdit::singleline(&mut node_info.client_ip)
+                        .hint_text("Client IP Address")
+                        .desired_width(150.0),
+                );
+
+                ui.label("Client Port:");
+                ui.add(
+                    egui::TextEdit::singleline(&mut node_info.client_port)
+                        .hint_text("Client Port Number")
+                        .desired_width(80.0),
+                );
+            });
+
+            // Node Alias
+            ui.horizontal(|ui| {
+                ui.label("Node Alias:");
+                ui.add(
+                    egui::TextEdit::singleline(&mut node_info.alias)
+                        .hint_text("Node Alias")
+                        .desired_width(200.0),
+                );
+            });
+
+            // BLS Key
+            ui.horizontal(|ui| {
+                ui.label("BLS Key:");
+                ui.add(
+                    egui::TextEdit::singleline(&mut node_info.blskey)
+                        .hint_text("BLS Key")
+                        .desired_width(400.0),
+                );
+            });
+
+            // BLS Key Proof of Possession
+            ui.horizontal(|ui| {
+                ui.label("BLS Key POP:");
+                ui.add(
+                    egui::TextEdit::singleline(&mut node_info.blskey_pop)
+                        .hint_text("BLS Key Proof of Possession")
+                        .desired_width(400.0),
+                );
+            });
+
+            // Services
+            ui.horizontal(|ui| {
+                ui.label("Services:");
+                ui.checkbox(&mut node_info.is_validator, "VALIDATOR");
+            });
+        });
+
+        // Check each field and add the name of the missing fields to a vector
+        let mut missing_fields = Vec::new();
+        if node_info.target_verkey.is_empty() {
+            missing_fields.push("Target DID");
+        }
+        if node_info.node_ip.is_empty() {
+            missing_fields.push("Node IP");
+        }
+        if node_info.node_port.is_empty() || node_info.node_port.parse::<i32>().is_err() {
+            missing_fields.push("Node Port (must be a valid number)");
+        }
+        if node_info.client_ip.is_empty() {
+            missing_fields.push("Client IP");
+        }
+        if node_info.client_port.is_empty() || node_info.client_port.parse::<i32>().is_err() {
+            missing_fields.push("Client Port (must be a valid number)");
+        }
+        if node_info.alias.is_empty() {
+            missing_fields.push("Node Alias");
+        }
+        if node_info.blskey.is_empty() {
+            missing_fields.push("BLS Key");
+        }
+        if node_info.blskey_pop.is_empty() {
+            missing_fields.push("BLS Key POP");
+        }
+
+        // Create a string from the vector of missing fields
+        let missing_fields_str = missing_fields.join(", ");
+
+        // Display the missing fields in the label
+        if !missing_fields.is_empty() {
+            ui.colored_label(
+                egui::Color32::LIGHT_RED,
+                format!("Please fill the following fields: {}", missing_fields_str),
+            );
+        } else if ui.button("Prepare Node Transaction").clicked() {
+            if let Some(ledger) = ledgers {
+                let wallet_ref = wallet.as_ref().unwrap();
+
+                // Create the services vector based on checkbox
+                let services = if node_info.is_validator {
+                    Some(vec![Services::VALIDATOR])
+                } else {
+                    Some(vec![Services::OBSERVER])
+                };
+
+                // Create the NodeOperationData
+                let node_data = NodeOperationData {
+                    node_ip: Some(node_info.node_ip.clone()),
+                    node_port: Some(node_info.node_port.parse::<i32>().unwrap()),
+                    client_ip: Some(node_info.client_ip.clone()),
+                    client_port: Some(node_info.client_port.parse::<i32>().unwrap()),
+                    alias: node_info.alias.clone(),
+                    services,
+                    blskey: Some(node_info.blskey.clone()),
+                    blskey_pop: Some(node_info.blskey_pop.clone()),
+                };
+
+                // Validate the NodeOperationData
+                match node_data.validate() {
+                    Ok(_) => {
+                        match block_on(ledger.publish_node(
+                            wallet_ref,
+                            &wallet_ref.did,
+                            &node_info.target_verkey,
+                            node_data,
+                            transaction_options,
+                        )) {
+                            Ok(result) => {
+                                // Store only the raw transaction JSON
+                                *txn_result = result;
+
+                                // Display additional context in the UI only
+                                ui.label(if transaction_options.send {
+                                    "Node registration transaction submitted successfully:"
+                                } else if transaction_options.sign {
+                                    "Signed node registration transaction (not submitted):"
+                                } else {
+                                    "Unsigned node registration transaction:"
+                                });
+
+                                // Display the formatted transaction
+                                ui.monospace(&*txn_result);
+                            }
+                            Err(e) => {
+                                *txn_result = format!("Error: {}", e);
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        *txn_result = format!("Invalid node data: {}", e);
+                    }
+                }
+            }
+        }
     }
     // Add copy button for the transaction result
     ui.separator();
@@ -391,6 +580,15 @@ pub fn publish_tool_ui(
                         "Signed schema transaction (not submitted):"
                     } else {
                         "Prepared schema transaction (unsigned):"
+                    }
+                }
+                "Node" => {
+                    if transaction_options.send {
+                        "Node registration transaction submitted successfully:"
+                    } else if transaction_options.sign {
+                        "Signed node registration transaction (not submitted):"
+                    } else {
+                        "Prepared node registration transaction (unsigned):"
                     }
                 }
                 "Custom" => {

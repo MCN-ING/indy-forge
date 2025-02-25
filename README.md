@@ -22,6 +22,7 @@ project.
 - Custom transaction publishing
 - Schema creation and publishing
 - NYM registration with role management
+- Node registration for validators and observers
 - Genesis file management with previewing capabilities
 - Real-time connection status monitoring
 
@@ -53,6 +54,25 @@ Sadly, for the moment, the zmq library is preventing a webassembly build.
 - DID:INDY generation uses SHA256(verkey) with base58 encoding
 - Comprehensive validation of DID-verkey relationships
 - Cross-validated cryptographic operations
+
+## Transaction Types
+
+### NYM Transactions
+Register DIDs on the ledger with specific roles (Author, Endorser, Network Monitor, Steward, Trustee).
+
+### Schema Transactions
+Create and publish attribute schemas for verifiable credentials.
+
+### Node Transactions
+Register validator or observer nodes on the network with the following information:
+- Node verification key
+- Node and client IP addresses and ports
+- Node alias
+- BLS key and proof of possession
+- Service type (VALIDATOR or OBSERVER)
+
+### Custom Transactions
+Submit any valid Indy transaction by directly providing the JSON payload.
 
 ## Local Storage
 
@@ -91,6 +111,10 @@ projet.
 ## Outil de création de NYM
 
 Outil pour enregistrer un nouveau NYM et son rôle sur Indy Ledger.
+
+## Outil d'enregistrement de nœud
+
+Outil pour enregistrer un nœud validateur ou observateur sur le réseau Indy.
 
 ## Pour commencer
 
