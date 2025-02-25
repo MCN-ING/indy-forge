@@ -71,7 +71,10 @@ pub fn create_wallet_ui(
             .password(!*show_seed),
     );
     // toggle button
-    if ui.button(if *show_seed { "🙈 Hide" } else { "👁 Show" }).clicked() {
+    if ui
+        .button(if *show_seed { "🙈 Hide" } else { "👁 Show" })
+        .clicked()
+    {
         *show_seed = !*show_seed;
     }
     ui.label(format!("Length: {}", seed.len()));

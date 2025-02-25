@@ -23,8 +23,15 @@ pub fn endorser_tool(
                 .password(!*show_endorser_seed),
         );
         // Add a toggle button with eye icon
-        if ui.button(if *show_endorser_seed { "🙈 Hide" } else { "👁 Show" }).clicked() {
-            *show_endorser_seed = !*show_endorser_seed; 
+        if ui
+            .button(if *show_endorser_seed {
+                "🙈 Hide"
+            } else {
+                "👁 Show"
+            })
+            .clicked()
+        {
+            *show_endorser_seed = !*show_endorser_seed;
         }
         ui.label(format!("Length: {}", endorser_seed.len()));
         ui.label("Select the version for the DID.  did:Sov is 1, did:Indy is 2");

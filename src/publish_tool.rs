@@ -1,4 +1,4 @@
-use crate::app::{MyRoles, NymInfo, SchemaInfo, TransactionOptions, NodeInfo};
+use crate::app::{MyRoles, NodeInfo, NymInfo, SchemaInfo, TransactionOptions};
 use crate::helpers::genesis::GenesisSource;
 use crate::helpers::ledgers::IndyLedger;
 use crate::helpers::wallet::IndyWallet;
@@ -377,7 +377,7 @@ pub fn publish_tool_ui(
                 egui::Color32::from_rgb(144, 238, 144),
                 "Enter the node registration details",
             );
-            
+
             // Target DID (Node owner)
             ui.horizontal(|ui| {
                 ui.label("Target Verkey:");
@@ -387,7 +387,7 @@ pub fn publish_tool_ui(
                         .desired_width(300.0),
                 );
             });
-            
+
             // Node IP and Port
             ui.horizontal(|ui| {
                 ui.label("Node IP:");
@@ -396,7 +396,7 @@ pub fn publish_tool_ui(
                         .hint_text("Node IP Address")
                         .desired_width(150.0),
                 );
-                
+
                 ui.label("Node Port:");
                 ui.add(
                     egui::TextEdit::singleline(&mut node_info.node_port)
@@ -404,7 +404,7 @@ pub fn publish_tool_ui(
                         .desired_width(80.0),
                 );
             });
-            
+
             // Client IP and Port
             ui.horizontal(|ui| {
                 ui.label("Client IP:");
@@ -413,7 +413,7 @@ pub fn publish_tool_ui(
                         .hint_text("Client IP Address")
                         .desired_width(150.0),
                 );
-                
+
                 ui.label("Client Port:");
                 ui.add(
                     egui::TextEdit::singleline(&mut node_info.client_port)
@@ -421,7 +421,7 @@ pub fn publish_tool_ui(
                         .desired_width(80.0),
                 );
             });
-            
+
             // Node Alias
             ui.horizontal(|ui| {
                 ui.label("Node Alias:");
@@ -431,7 +431,7 @@ pub fn publish_tool_ui(
                         .desired_width(200.0),
                 );
             });
-            
+
             // BLS Key
             ui.horizontal(|ui| {
                 ui.label("BLS Key:");
@@ -441,7 +441,7 @@ pub fn publish_tool_ui(
                         .desired_width(400.0),
                 );
             });
-            
+
             // BLS Key Proof of Possession
             ui.horizontal(|ui| {
                 ui.label("BLS Key POP:");
@@ -451,14 +451,14 @@ pub fn publish_tool_ui(
                         .desired_width(400.0),
                 );
             });
-            
+
             // Services
             ui.horizontal(|ui| {
                 ui.label("Services:");
                 ui.checkbox(&mut node_info.is_validator, "VALIDATOR");
             });
         });
-    
+
         // Check each field and add the name of the missing fields to a vector
         let mut missing_fields = Vec::new();
         if node_info.target_verkey.is_empty() {
@@ -485,30 +485,27 @@ pub fn publish_tool_ui(
         if node_info.blskey_pop.is_empty() {
             missing_fields.push("BLS Key POP");
         }
-    
+
         // Create a string from the vector of missing fields
         let missing_fields_str = missing_fields.join(", ");
-    
+
         // Display the missing fields in the label
         if !missing_fields.is_empty() {
             ui.colored_label(
                 egui::Color32::LIGHT_RED,
-                format!(
-                    "Please fill the following fields: {}",
-                    missing_fields_str
-                ),
+                format!("Please fill the following fields: {}", missing_fields_str),
             );
         } else if ui.button("Prepare Node Transaction").clicked() {
             if let Some(ledger) = ledgers {
                 let wallet_ref = wallet.as_ref().unwrap();
-                
+
                 // Create the services vector based on checkbox
                 let services = if node_info.is_validator {
                     Some(vec![Services::VALIDATOR])
                 } else {
                     Some(vec![Services::OBSERVER])
                 };
-                
+
                 // Create the NodeOperationData
                 let node_data = NodeOperationData {
                     node_ip: Some(node_info.node_ip.clone()),
@@ -520,7 +517,7 @@ pub fn publish_tool_ui(
                     blskey: Some(node_info.blskey.clone()),
                     blskey_pop: Some(node_info.blskey_pop.clone()),
                 };
-                
+
                 // Validate the NodeOperationData
                 match node_data.validate() {
                     Ok(_) => {
@@ -534,7 +531,7 @@ pub fn publish_tool_ui(
                             Ok(result) => {
                                 // Store only the raw transaction JSON
                                 *txn_result = result;
-    
+
                                 // Display additional context in the UI only
                                 ui.label(if transaction_options.send {
                                     "Node registration transaction submitted successfully:"
@@ -543,7 +540,7 @@ pub fn publish_tool_ui(
                                 } else {
                                     "Unsigned node registration transaction:"
                                 });
-    
+
                                 // Display the formatted transaction
                                 ui.monospace(&*txn_result);
                             }
@@ -586,14 +583,14 @@ pub fn publish_tool_ui(
                     }
                 }
                 "Node" => {
-                if transaction_options.send {
-                    "Node registration transaction submitted successfully:"
-                } else if transaction_options.sign {
-                    "Signed node registration transaction (not submitted):"
-                } else {
-                    "Prepared node registration transaction (unsigned):"
+                    if transaction_options.send {
+                        "Node registration transaction submitted successfully:"
+                    } else if transaction_options.sign {
+                        "Signed node registration transaction (not submitted):"
+                    } else {
+                        "Prepared node registration transaction (unsigned):"
+                    }
                 }
-            }
                 "Custom" => {
                     if transaction_options.send {
                         "Transaction submitted successfully:"

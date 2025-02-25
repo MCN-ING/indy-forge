@@ -272,7 +272,6 @@ impl IndyLedger {
         }
     }
 
-
     pub async fn publish_node(
         &self,
         wallet: &IndyWallet,
@@ -281,15 +280,12 @@ impl IndyLedger {
         node_data: NodeOperationData,
         options: &TransactionOptions,
     ) -> VdrResult<String> {
-        let mut request = self
-            .pool
-            .get_request_builder()
-            .build_node_request(
-                &DidValue(submitter_did.to_string()),
-                &DidValue(target_did.to_string()),
-                node_data,
-            )?;
-    
+        let mut request = self.pool.get_request_builder().build_node_request(
+            &DidValue(submitter_did.to_string()),
+            &DidValue(target_did.to_string()),
+            node_data,
+        )?;
+
         let result = if options.sign {
             let sig_bytes = request.get_signature_input()?;
             let signature = wallet.sign(sig_bytes.as_bytes()).await;
@@ -297,7 +293,10 @@ impl IndyLedger {
             serde_json::to_string_pretty(&request.req_json).map_err(|e| {
                 VdrError::new(
                     VdrErrorKind::Input,
-                    Some(format!("Failed to serialize signed node transaction: {}", e)),
+                    Some(format!(
+                        "Failed to serialize signed node transaction: {}",
+                        e
+                    )),
                     None,
                 )
             })?
@@ -305,12 +304,15 @@ impl IndyLedger {
             serde_json::to_string_pretty(&request.req_json).map_err(|e| {
                 VdrError::new(
                     VdrErrorKind::Input,
-                    Some(format!("Failed to serialize unsigned node transaction: {}", e)),
+                    Some(format!(
+                        "Failed to serialize unsigned node transaction: {}",
+                        e
+                    )),
                     None,
                 )
             })?
         };
-    
+
         if options.send {
             self._submit_request(&request).await
         } else {

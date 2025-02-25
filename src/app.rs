@@ -11,7 +11,6 @@ use serde::{Deserialize, Serialize};
 use std::time::Duration;
 use tokio::time::timeout;
 
-
 #[derive(PartialEq, Eq, Deserialize, Serialize, Debug)]
 pub struct NodeInfo {
     pub target_verkey: String,
@@ -289,7 +288,7 @@ impl eframe::App for TemplateApp {
                     ui.separator();
                     ui.label("Tool that create a temporary wallet and hold the DID used by the other tools");
                     create_wallet_ui(ui,
-                                     &mut self.trustee_seed,                                     
+                                     &mut self.trustee_seed,
                                      &mut self.wallet,
                                      &mut self.genesis_source,
                                      &mut self.did_version,
@@ -513,7 +512,7 @@ impl eframe::App for TemplateApp {
                                     &mut self.publish_option,
                                     &mut self.nym_role,
                                     &mut self.nym_info,
-                                    &mut self.node_info, 
+                                    &mut self.node_info,
                                     &mut self.genesis_source,
                                     &mut self.ledgers,
                                     &mut self.txn_result,
