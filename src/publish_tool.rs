@@ -620,7 +620,7 @@ pub fn publish_tool_ui(
 mod tests {
     use super::*;
     use crate::app::MyRoles;
-    use indy_vdr::ledger::{constants, RequestBuilder};
+    use indy_vdr::ledger::{RequestBuilder, constants};
     use indy_vdr::pool::ProtocolVersion;
 
     #[test]

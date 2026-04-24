@@ -1,4 +1,4 @@
-use indy_data_types::did::{generate_did, DidValue};
+use indy_data_types::did::{DidValue, generate_did};
 use indy_data_types::keys::PrivateKey;
 use indy_vdr::common::error::{VdrError, VdrErrorKind, VdrResult};
 use indy_vdr::pool::PreparedRequest;

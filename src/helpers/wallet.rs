@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result, anyhow};
 use aries_askar::kms::{KeyAlg, LocalKey};
 use sha2::{Digest, Sha256};
 
@@ -31,7 +31,7 @@ impl IndyWallet {
         let key = match seed {
             Some(seed) => LocalKey::from_secret_bytes(KeyAlg::Ed25519, seed.as_bytes())
                 .context("Failed to create key from seed")?,
-            None => LocalKey::generate(KeyAlg::Ed25519, false)
+            None => LocalKey::generate_with_rng(KeyAlg::Ed25519, false)
                 .context("Failed to generate random key")?,
         };
 

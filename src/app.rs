@@ -4,7 +4,7 @@ use crate::helpers::wallet::IndyWallet;
 use crate::helpers::workflow_guide::WorkflowGuide;
 use crate::indorser::endorser_tool;
 use crate::publish_tool::publish_tool_ui;
-use crate::wallet_tool::{create_wallet_ui, RecentUrls};
+use crate::wallet_tool::{RecentUrls, create_wallet_ui};
 use egui::TextBuffer;
 use futures_executor::block_on;
 use serde::{Deserialize, Serialize};
