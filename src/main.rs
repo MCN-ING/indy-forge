@@ -21,7 +21,7 @@ async fn main() -> eframe::Result<()> {
     eframe::run_native(
         "IndyForge",
         native_options,
-        Box::new(|cc| Box::new(indyforge::TemplateApp::new(cc))),
+        Box::new(|cc| Ok(Box::new(indyforge::TemplateApp::new(cc)))),
     )
 }
 

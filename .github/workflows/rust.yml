@@ -83,14 +83,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: macos-latest
-            target: aarch64-apple-darwin
-            extension: ""
-
-          - os: macos-latest
-            target: x86_64-apple-darwin
-            extension: ""
-
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
             extension: ""
@@ -117,10 +109,6 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y cmake libssl-dev pkg-config libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libxkbcommon-dev
 
-      - name: Install macOS dependencies
-        if: runner.os == 'macOS'
-        run: brew install cmake
-
       - name: Install Windows dependencies
         if: runner.os == 'Windows'
         run: |
@@ -141,8 +129,6 @@ jobs:
           cd artifacts
           if [[ "$RUNNER_OS" == "Windows" ]]; then
             certutil -hashfile indyforge-${{ matrix.target }}${{ matrix.extension }} SHA256 > indyforge-${{ matrix.target }}.sha256
-          elif [[ "$RUNNER_OS" == "macOS" ]]; then
-            shasum -a 256 indyforge-${{ matrix.target }}${{ matrix.extension }} > indyforge-${{ matrix.target }}.sha256
           else
             sha256sum indyforge-${{ matrix.target }}${{ matrix.extension }} > indyforge-${{ matrix.target }}.sha256
           fi

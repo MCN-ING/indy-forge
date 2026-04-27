@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result, anyhow};
 use indy_vdr::pool::PoolTransactions;
 use reqwest;
 use reqwest::Client;

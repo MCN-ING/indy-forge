@@ -1,3 +1,5 @@
+[env]
+CMAKE_ARGS = "-DCMAKE_POLICY_VERSION_MINIMUM=3.5"
 # clipboard api is still unstable, so web-sys requires the below flag to be passed for copy (ctrl + c) to work
 # https://rustwasm.github.io/docs/wasm-bindgen/web-sys/unstable-apis.html
 # check status at https://developer.mozilla.org/en-US/docs/Web/API/Clipboard#browser_compatibility
